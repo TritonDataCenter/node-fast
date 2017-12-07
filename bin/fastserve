@@ -7,7 +7,7 @@
  */
 
 /*
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -18,6 +18,7 @@ var mod_assertplus = require('assert-plus');
 var mod_artedi = require('artedi');
 var mod_bunyan = require('bunyan');
 var mod_cmdutil = require('cmdutil');
+var mod_getopt = require('posix-getopt');
 var mod_fastdemo = require('../lib/demo_server');
 var mod_fastserver = require('../lib/fast_server');
 var mod_kang = require('kang');
@@ -34,15 +35,32 @@ var usageMessage = [
 
 function main()
 {
-	var argv, port;
+	var argv, port, option;
+
+	var config = {
+		'quiesce': false
+	};
 
 	mod_cmdutil.configure({
-	    'synopses': [ 'PORT' ],
+	    'synopses': [ '[OPTIONS] PORT' ],
 	    'usageMessage': usageMessage
 	});
 	mod_cmdutil.exitOnEpipe();
 
-	argv = process.argv.slice(2);
+	var parser = new mod_getopt.BasicParser('q(quiesce)', process.argv);
+	while ((option = parser.getopt()) !== undefined) {
+		switch (option.option) {
+			case 'q':
+				config.quiesce = true;
+				break;
+			default:
+				mod_assertplus.equal('?', option.option);
+				mod_cmdutil.usage();
+				break;
+		}
+	}
+
+	argv = process.argv.slice(parser.optind());
 	if (argv.length != 1) {
 		mod_cmdutil.usage('expected PORT');
 	}
@@ -53,8 +71,9 @@ function main()
 	}
 
 	fastDemoServer({
-	    'fastPort': port,
-	    'monitorPort': MONITOR_PORT
+		'fastPort': port,
+		'monitorPort': MONITOR_PORT,
+		'config': config
 	});
 }
 
@@ -66,6 +85,9 @@ function fastDemoServer(args)
 	mod_assertplus.object(args, 'args');
 	mod_assertplus.number(args.fastPort, 'args.fastPort');
 	mod_assertplus.number(args.monitorPort, 'args.monitorPort');
+	mod_assertplus.object(args.config, 'args.config');
+
+	var config = args.config;
 
 	collector = mod_artedi.createCollector({
 	    'labels': {
@@ -138,9 +160,19 @@ function fastDemoServer(args)
 
 		process.on('SIGINT', function () {
 			if (++nsigs == 1) {
-				monitor_server.close();
 				sock.close();
-				fastserver.close();
+
+				function shutdown() {
+					monitor_server.close();
+					fastserver.close();
+				}
+
+				if (config.quiesce) {
+					log.info('quiescing server');
+					fastserver.onConnsDestroyed(shutdown);
+				} else {
+					shutdown();
+				}
 			}
 		});
 	});

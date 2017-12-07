@@ -4,6 +4,10 @@
 
 None yet.
 
+## v2.4.0
+
+* #14 want node-fast FastServer 'onConnsDestroyed' method
+
 ## v2.3.2
 
 * #15 server leaks memory on socket errors

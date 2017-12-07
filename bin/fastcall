@@ -7,7 +7,7 @@
  */
 
 /*
- * Copyright (c) 2016, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -20,16 +20,29 @@ var mod_assertplus = require('assert-plus');
 var mod_bunyan = require('bunyan');
 var mod_cmdutil = require('cmdutil');
 var mod_fast = require('../lib/fast_client');
+var mod_getopt = require('posix-getopt');
 var mod_net = require('net');
+
+var OPTS = {
+	'a': 'abandon the RPC request after issuing it ' +
+		'via FastClientRequest#abandon',
+	'c': 'do not close the socket used to talk ' +
+		'to the FastServer until SIGINT'
+};
 
 function main()
 {
-	var argv, doabandon, host, port, rpcmethod, rpcargs;
+	var argv, host, port, rpcmethod, rpcargs;
+	var doabandon = false;
+	var leaveconnopen = false;
 	var timeout = null;
 
 	mod_cmdutil.configure({
-	    'synopses': [ '[--abandon-immediately] HOST PORT METHOD ARGS' ],
+	    'synopses': [ '[OPTIONS] HOST PORT METHOD ARGS' ],
 	    'usageMessage': [
+		'    OPTIONS',
+		'        -a,--abandon-immediately   ' + OPTS['a'],
+		'        -c,--leave-conn-open       ' + OPTS['c'],
 	        '    HOST     DNS name or IP address for remote server',
 		'    PORT     TCP port for remote server',
 		'    METHOD   Name of remote RPC method call',
@@ -38,14 +51,25 @@ function main()
 	});
 	mod_cmdutil.exitOnEpipe();
 
-	argv = process.argv.slice(2);
-	if (argv.length > 4 && argv[0] == '--abandon-immediately') {
-		doabandon = true;
-		argv.shift();
-	} else {
-		doabandon = false;
+	var option;
+	var parser = new mod_getopt.BasicParser('a(abandon-immediately)' +
+	    'c(leave-conn-open)', process.argv);
+	while ((option = parser.getopt()) !== undefined) {
+		switch (option.option) {
+			case 'c':
+				leaveconnopen = true;
+				break;
+			case 'a':
+				doabandon = true;
+				break;
+			default:
+				mod_assertplus.equal('?', option.option);
+				mod_cmdutil.usage();
+				break;
+		}
 	}
 
+	argv = process.argv.slice(parser.optind());
 	if (argv.length != 4) {
 		mod_cmdutil.usage('expected four non-option arguments');
 	}
@@ -73,7 +97,8 @@ function main()
 	    'rpcmethod': rpcmethod,
 	    'rpcargs': rpcargs,
 	    'timeout': timeout,
-	    'abandonImmediately': doabandon
+	    'abandonImmediately': doabandon,
+	    'leaveConnOpen': leaveconnopen
 	}, function (err, result) {
 		if (err) {
 			mod_cmdutil.warn(err);
@@ -84,7 +109,7 @@ function main()
 function fastcall(args, callback)
 {
 	var log, conn;
-	var rpcmethod, rpcargs, timeout, doabandon;
+	var rpcmethod, rpcargs, timeout, doabandon, leaveconnopen;
 
 	mod_assertplus.object(args, 'args');
 	mod_assertplus.string(args.host, 'args.host');
@@ -93,11 +118,13 @@ function fastcall(args, callback)
 	mod_assertplus.string(args.rpcmethod, 'args.rpcmethod');
 	mod_assertplus.array(args.rpcargs, 'args.rpcargs');
 	mod_assertplus.bool(args.abandonImmediately, 'args.abandonImmediately');
+	mod_assertplus.bool(args.leaveConnOpen, 'args.leaveConnOpen');
 
 	rpcmethod = args.rpcmethod;
 	rpcargs = args.rpcargs;
 	timeout = args.timeout;
 	doabandon = args.abandonImmediately;
+	leaveconnopen = args.leaveConnOpen;
 
 	log = new mod_bunyan({
 	    'name': 'fastcall',
@@ -108,6 +135,19 @@ function fastcall(args, callback)
 	conn = mod_net.createConnection(args.port, args.host);
 
 	conn.on('connect', function onConnect() {
+		/*
+		 * If the '--leave-conn-open' option was specified, then we
+		 * leave the connection open until the user sends a SIGINT to
+		 * the process. The purpose of this option is to demonstrate the
+		 * function of FastServer#onConnsDestroyed. See documentation
+		 * on the '--quiesce' option to fastserve for more information.
+		 */
+		if (leaveconnopen) {
+			process.on('SIGINT', function () {
+				conn.destroy();
+			});
+		}
+
 		var fastconn, req;
 
 		fastconn = new mod_fast.FastClient({
@@ -117,7 +157,9 @@ function fastcall(args, callback)
 		});
 
 		fastconn.on('error', function (err) {
-			conn.destroy();
+			if (!leaveconnopen) {
+				conn.destroy();
+			}
 			callback(new VError(err, 'fast connection'));
 		});
 
@@ -132,7 +174,9 @@ function fastcall(args, callback)
 		}
 
 		req.on('error', function (err) {
-			conn.destroy();
+			if (!leaveconnopen) {
+				conn.destroy();
+			}
 			callback(new VError(err, 'fast request'));
 		});
 
@@ -141,7 +185,9 @@ function fastcall(args, callback)
 		});
 
 		req.on('end', function () {
-			conn.destroy();
+			if (!leaveconnopen) {
+				conn.destroy();
+			}
 			callback();
 		});
 	});

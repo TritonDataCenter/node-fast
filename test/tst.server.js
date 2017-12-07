@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -15,6 +15,7 @@
 var mod_assertplus = require('assert-plus');
 var mod_artedi = require('artedi');
 var mod_bunyan = require('bunyan');
+var mod_jsprim = require('jsprim');
 var mod_net = require('net');
 var mod_path = require('path');
 var mod_vasync = require('vasync');
@@ -24,6 +25,7 @@ var mod_fastdemo = require('../lib/demo_server');
 var mod_protocol = require('../lib/fast_protocol');
 var mod_testcommon = require('./common');
 
+var EventEmitter = require('events');
 var VError = require('verror');
 
 var testLog;
@@ -355,6 +357,74 @@ function runConnFailureTest(tctx, injectFail, checkError, callback)
 	    }
 	] }, callback);
 }
+
+/*
+ * Run a test that performs some client work and then checks for the receipt of
+ * an onConnsDestroyed callback after terminating the client connections.
+ *
+ * This test check verifies:
+ *	- The callback has been received within a reasonable timeout window
+ *	- The callback is received with the proper context: no active server
+ *	  connections.
+ *
+ * It does not verify that the callback is only received once. This is done in
+ * separate tests.
+ */
+function runOnConnsDestroyedCallbackTest(tctx, doClientWork, callback) {
+	mod_assertplus.ok(tctx, 'tctx');
+	mod_assertplus.func(doClientWork, 'doClientWork');
+	mod_assertplus.func(callback, 'callback');
+
+	var server = tctx.ts_server;
+	var server_socket = tctx.ts_socket;
+	var client;
+	var timedout = false;
+
+	/*
+	 * Timeout on the entire test. Any success path with invoke
+	 * clearTimeout on the handle returned by this call to
+	 * setTimeout.
+	 */
+	var WAIT_MS = 3000;
+	var timeout = setTimeout(function () {
+		timedout = true;
+		callback(new VError('did not receive' +
+		    '\'onConnsDestroyed\' callback'));
+	}, WAIT_MS);
+
+	server_socket.once('connection', function () {
+		server.onConnsDestroyed(function () {
+			if (timedout) {
+				return;
+			}
+			clearTimeout(timeout);
+
+			mod_assertplus.ok(server.fs_conns, 'server.fs_conns');
+			if (!mod_jsprim.isEmpty(server.fs_conns)) {
+				callback(new VError('received ' +
+				    '\'onConnsDestroyed\' callback when ' +
+				    'server still had active connections.'));
+				return;
+			}
+			callback();
+		});
+	});
+
+	tctx.connectClient(function () {
+		client = tctx.ts_clients[1].tsc_client;
+		doClientWork(client, function (err) {
+			tctx.ts_clients.forEach(function (c) {
+				c.tsc_client.detach();
+				c.tsc_socket.destroy();
+			});
+			if (!timedout && err) {
+				clearTimeout(timeout);
+				callback(err);
+			}
+		});
+	});
+}
+
 
 serverTestCases = [ {
     'name': 'basic RPC: no data',
@@ -860,6 +930,262 @@ serverTestCases = [ {
 	csock.pause();
     }
 
+}, {
+    'name': '\'onConnsDestroyed\' callback test',
+    'run': function (tctx, callback) {
+	var received = false;
+	var server = tctx.ts_server;
+
+	var WAIT_MS = 3000;
+	var timeout = setTimeout(function () {
+		mod_assertplus.ok(false, 'did not receive ' +
+		    '\'onConnsDestroyed\' within timeout window');
+	}, WAIT_MS);
+
+	function verifyCallbackContext(cb) {
+		mod_assertplus.ok(!received, 'received \'onConnsDestroyed\' ' +
+		    'callback twice');
+		mod_assertplus.ok(server.fs_conns, 'server.fs_conns');
+		mod_assertplus.ok(mod_jsprim.isEmpty(server.fs_conns),
+		    'received \'onConnsDestroyed\' callback when server had ' +
+		    'active server connections');
+
+		received = true;
+		cb();
+	}
+
+	mod_vasync.waterfall([
+		function (qcb) {
+			/*
+			 * Check that connection count dropping to 0
+			 * triggers the callback
+			 */
+			server.onConnsDestroyed(function () {
+				setImmediate(verifyCallbackContext, qcb);
+			});
+		},
+		function (qcb) {
+			received = false;
+			/*
+			 * Check that the callback is issued when the
+			 * connection count was already 0 prior to
+			 * calling onConnsDestroyed.
+			 */
+			server.onConnsDestroyed(function () {
+				setImmediate(verifyCallbackContext.bind(null,
+				    qcb));
+			});
+		}
+	], function (err) {
+		clearTimeout(timeout);
+		callback();
+	});
+
+	tctx.ts_clients.forEach(function (c) {
+		c.tsc_client.detach();
+		c.tsc_socket.destroy();
+	});
+    }
+}, {
+    'name': '\'onConnsDestroyed\' callback after successful rpc',
+    'run': function (tctx, callback) {
+	function doRpc(client, cb) {
+		client.rpcBufferAndCallback({
+			'rpcmethod': 'yes',
+			'rpcargs': [ {
+				value: 'yes',
+				count: 1
+			} ],
+			'maxObjectsToBuffer': 1
+		}, function (err, data, ndata) {
+			mod_assertplus.ok(!err, 'received unexpected error ' +
+				'from dummy rpc');
+			mod_assertplus.ok(ndata == 1, 'received more data ' +
+				'than expected');
+			cb();
+		});
+	}
+	runOnConnsDestroyedCallbackTest(tctx, doRpc, callback);
+    }
+}, {
+    'name': '\'onConnsDestroyed\' callback after protocol error',
+    'run': function (tctx, callback) {
+	function doBadRpc(client, cb) {
+		client.rpcBufferAndCallback({
+			'rpcmethod': '',
+			'rpcargs': [],
+			'maxObjectsToBuffer': 0
+		}, function (err, data, ndata) {
+			mod_assertplus.ok(err, 'did not receive error on ' +
+				'non-existent RPC');
+			mod_assertplus.ok(data.length === 0, 'received ' +
+				'unexpected data from non-existent RPC');
+			cb();
+		});
+	}
+	runOnConnsDestroyedCallbackTest(tctx, doBadRpc, callback);
+    }
+}, {
+    'name': '\'onConnsDestroyed\' multiple callbacks queued',
+    'run': function (tctx, callback) {
+	var server = tctx.ts_server;
+
+	var callback_one_ts = null;
+	var callback_two_ts = null;
+
+	var WAIT_MS = 3000;
+	var timeout = setTimeout(function () {
+		mod_assertplus.ok(false, 'did not complete callbacks in time');
+	}, WAIT_MS);
+
+	function verifyCallbackContext(hrtime) {
+		mod_assertplus.ok(hrtime === null, 'received ' +
+		    '\'onConnsDestroyed\' callback more than once');
+
+		mod_assertplus.ok(server.fs_conns, 'server.fs_conns');
+		mod_assertplus.ok(mod_jsprim.isEmpty(server.fs_conns),
+		    'received \'onConnsDestroyed\' callback from a server ' +
+		    'with active connections');
+	}
+
+	server.onConnsDestroyed(function () {
+		setImmediate(verifyCallbackContext.bind(null, callback_one_ts));
+		callback_one_ts = process.hrtime();
+	});
+
+	server.onConnsDestroyed(function () {
+		setImmediate(verifyCallbackContext.bind(null, callback_two_ts));
+		callback_two_ts = process.hrtime();
+
+		mod_assertplus.ok(callback_one_ts !== null, 'received ' +
+			'second callback without receiving the first');
+
+		var one_ts = mod_jsprim.hrtimeNanosec(callback_one_ts);
+		var two_ts = mod_jsprim.hrtimeNanosec(callback_two_ts);
+		mod_assertplus.ok(one_ts <= two_ts, 'callbacks received in ' +
+		    'wrong order');
+
+		clearTimeout(timeout);
+		callback();
+	});
+
+	tctx.ts_clients.forEach(function (c) {
+		c.tsc_client.detach();
+		c.tsc_socket.destroy();
+	});
+
+    }
+}, {
+    'name': '\'onConnsDestroyed\' callback after many requests',
+    'run': function (tctx, callback) {
+	var which = 0;
+	var server = tctx.ts_server;
+	var server_socket = tctx.ts_socket;
+
+	var callback_ts = null;
+	var finish_ts = null;
+
+	server.registerRpcMethod({
+		'rpcmethod': 'alternate',
+		'rpchandler': function (rpc) {
+			var whichrpc = which++;
+			if (whichrpc % 2 === 0) {
+				rpc.end({'value': whichrpc});
+			} else {
+				rpc.fail(new VError('%d', whichrpc));
+			}
+		}
+	});
+
+	/*
+	 * Subscribe to the empty connection set notification upon
+	 * connecting the second client.
+	 */
+	server_socket.once('connection', function () {
+		/*
+		 * We expect that the callback is called after both
+		 * clients have closed their connections to the server.
+		 */
+		server.onConnsDestroyed(function () {
+			mod_assertplus.ok(callback_ts === null, 'received ' +
+				'\'onConnsDestroyed\' callback twice');
+			mod_assertplus.ok(tctx.ts_server.fs_conns,
+			    'tctx.ts_server.fs_conns');
+			mod_assertplus.ok(mod_jsprim.isEmpty(server.fs_conns),
+				'received \'onConnsDestroyed\' callback with ' +
+				'active server connections');
+			callback_ts = process.hrtime();
+		});
+	});
+
+	tctx.connectClient(function () {
+		var choice = 0;
+		var nrequests = 200;
+		var ncomplete = 0;
+		var e = new EventEmitter();
+
+		var queue = mod_vasync.queuev({
+			'concurrency': 100,
+			'worker': function makeRequest(_, qcallback) {
+				choice = 1 - choice;
+				var c = tctx.ts_clients[choice].tsc_client;
+				c.rpcBufferAndCallback({
+					'rpcmethod': 'alternate',
+					'rpcargs': [],
+					'maxObjectsToBuffer': 1
+				}, function () {
+					if (++ncomplete == nrequests) {
+						e.emit('complete');
+					}
+				});
+				qcallback();
+			}
+		});
+		for (var i = 0; i < nrequests; i++) {
+			queue.push(i);
+		}
+
+		/*
+		 * Detach and close the clients that sent the requests
+		 * that just finished sending requests. This should
+		 * trigger the 'onConnsDestroyed' callback.
+		 */
+		e.on('complete', function () {
+			var WAIT = 3000;
+			finish_ts = process.hrtime();
+			tctx.ts_clients.forEach(function (c) {
+				c.tsc_client.detach();
+				c.tsc_socket.destroy();
+			});
+			setTimeout(checkForOnConnsDestroyedCallback, WAIT);
+		});
+
+		/*
+		 * Called after all the requests have been sent to
+		 * verify that the onConnsDestroyed callback was received
+		 * after the stream of requests completed.
+		 */
+		function checkForOnConnsDestroyedCallback() {
+			mod_assertplus.ok(callback_ts !== null, 'did not ' +
+			    'receive \'onConnsDestroyed\' callback');
+
+			var destroyed = mod_jsprim.hrtimeNanosec(callback_ts);
+			var finish = mod_jsprim.hrtimeNanosec(finish_ts);
+
+			/*
+			 * Sanity check that the 'onConnsDestroyed' callback
+			 * was emitted after the client sockets were
+			 * closed.
+			 */
+			mod_assertplus.ok(destroyed >= finish, 'received ' +
+			    '\'onConnsDestroyed\' callback before all ' +
+			    'requests were sent');
+
+			callback();
+		}
+		queue.close();
+	});
+    }
 } ];
 
 main();

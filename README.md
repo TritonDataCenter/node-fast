@@ -371,6 +371,16 @@ handlers for outstanding requests continue as normal, and any data emitted is
 ignored.  As a result, though, these handlers may continue running even after
 this function has been called and client sockets are destroyed.
 
+#### onConnsDestroyed(callback): do work when all connections are destroyed
+
+This method pushes its `callback` argument on a queue of work to be done the
+next time the FastServer connection count goes to zero. If the connection count
+is already zero when `onConnsDestroyed` is called, the callback is invoked
+immediately.
+
+All callbacks pushed on the queue before the next time the connection count goes
+to zero are called in FIFO order the next time all connections are destroyed.
+Any callback pushed this way is called exactly once.
 
 ## Protocol overview
 
