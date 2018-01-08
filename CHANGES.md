@@ -2,6 +2,11 @@
 
 ## Not yet released.
 
+None yet.
+
+## v2.3.2
+
+* #15 server leaks memory on socket errors
 * #12 want support for node v6.12.0
 
 ## v2.3.1
