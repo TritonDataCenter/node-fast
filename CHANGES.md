@@ -2,7 +2,7 @@
 
 ## Not yet released.
 
-None yet.
+* #16 fastserve cannot be run concurrently even with different arguments
 
 ## v2.4.0
 

@@ -30,7 +30,7 @@ arguments are required unless otherwise specified.
 
 Start the Fast server:
 
-    $ fastserve 2030 > server.log &
+    $ fastserve -p 2030 > server.log &
 
 Use `fastcall` to invoke the `date` RPC method inside the client:
 
