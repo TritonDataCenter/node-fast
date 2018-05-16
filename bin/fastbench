@@ -7,7 +7,7 @@
  */
 
 /*
- * Copyright (c) 2016, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -15,11 +15,13 @@
  * measuring latency and throughput.
  */
 
+var mod_artedi = require('artedi');
 var mod_assertplus = require('assert-plus');
 var mod_bunyan = require('bunyan');
 var mod_cmdutil = require('cmdutil');
 var mod_extsprintf = require('extsprintf');
 var mod_getopt = require('posix-getopt');
+var mod_http = require('http');
 var mod_jsprim = require('jsprim');
 var mod_kang = require('kang');
 var mod_net = require('net');
@@ -40,6 +42,8 @@ var fbDflConcurrency = 1;
 var fbDflReportingInterval = 5;
 /* default port for kang server */
 var fbDflKangPort = 16520;
+/* default port for artedi server */
+var fbDflArtediPort = 16521;
 
 /*
  * The Big Theory Statement in lib/fast_server.js explains that completing N
@@ -90,6 +94,7 @@ function main()
 	    'fbDuration': null,
 	    'fbReportingInterval': fbDflReportingInterval * 1000,
 	    'fbConcurrency': fbDflConcurrency,
+	    'fbArtediPort': fbDflArtediPort,
 	    'fbKangPort': fbDflKangPort
 	};
 
@@ -175,8 +180,11 @@ function parseOptInt(option, min)
 
 function fastbench(config)
 {
+	var collector;
 	var log, queue, bencher, nconns, i;
 	var start = new Date();
+
+	collector = mod_artedi.createCollector();
 
 	printf('%s (%d) pid %d: running workload "%s" ',
 	    start.toISOString(), start.getTime(), process.pid,
@@ -214,6 +222,7 @@ function fastbench(config)
 		});
 		csock.on('connect', function () {
 			var fastclient = new mod_fast.FastClient({
+			    'collector': collector,
 			    'log': log,
 			    'transport': csock,
 			    'nRecentRequests': 5
@@ -230,23 +239,13 @@ function fastbench(config)
 	    }
 	});
 
+
 	bencher = new FastBench();
 	bencher.fb_config = config;
 	bencher.fb_sockets = [];
 	bencher.fb_fastclients = [];
 
-	nconns = Math.ceil(config.fbConcurrency / fbDflRequestsPerConnection);
-	mod_assertplus.ok(nconns > 0);
-	for (i = 0; i < nconns; i++) {
-		queue.push(0);
-	}
-	queue.close();
-	queue.on('end', function () {
-		printf('established %d connections to %s:%d\n',
-		    bencher.fb_sockets.length, config.fbHost, config.fbPort);
-		mod_assertplus.equal(bencher.fb_sockets.length,
-		    bencher.fb_fastclients.length);
-
+	function _startKang(_, cb) {
 		mod_kang.knStartServer({
 		    'port': config.fbKangPort,
 		    'uri_base': '/kang',
@@ -262,6 +261,50 @@ function fastbench(config)
 			bencher.fb_kangserver = server;
 			log.info({ 'kangPort': config.fbKangPort },
 			    'listening for kang requests');
+		        cb();
+		});
+	}
+
+	function _startArtedi(_, cb) {
+		var server;
+
+		function _artediHandler(req, res) {
+			collector.collect(mod_artedi.FMT_PROM,
+			    function _outputMetrics(err, metrics) {
+				mod_assertplus.ok(!err);
+				res.end(metrics);
+			});
+		}
+
+		server = mod_http.createServer(_artediHandler);
+		server.listen(config.fbArtediPort, function _onListen(err) {
+			mod_assertplus.ok(!err);
+			bencher.fb_artediserver = server;
+			log.info({ artediPort: config.fbArtediPort },
+			    'listening for artedi requests');
+			cb();
+		});
+	}
+
+	nconns = Math.ceil(config.fbConcurrency / fbDflRequestsPerConnection);
+	mod_assertplus.ok(nconns > 0);
+	for (i = 0; i < nconns; i++) {
+		queue.push(0);
+	}
+	queue.close();
+	queue.on('end', function () {
+		printf('established %d connections to %s:%d\n',
+		    bencher.fb_sockets.length, config.fbHost, config.fbPort);
+		mod_assertplus.equal(bencher.fb_sockets.length,
+		    bencher.fb_fastclients.length);
+
+		mod_vasync.pipeline({
+			funcs: [
+			    _startKang,
+			    _startArtedi
+			]
+		}, function _pipelineComplete(err) {
+			mod_assertplus.ok(!err);
 
 			if (config.fbDuration !== null) {
 				setTimeout(function onCommandTimeout() {
@@ -292,6 +335,7 @@ function FastBench()
 	this.fb_nerrors = 0;	/* unexpected errors */
 	this.fb_hiwat = 0;	/* maximum observed concurrency */
 	this.fb_timeout = null;	/* reporting timeout */
+	this.fb_artediserver = null;	/* artedi server */
 	this.fb_kangserver = null;	/* kang server */
 
 	/* last reported stats */
@@ -398,6 +442,7 @@ FastBench.prototype.finish = function ()
 		clearTimeout(this.fb_timeout);
 	}
 
+	this.fb_artediserver.close();
 	this.fb_kangserver.close();
 	this.printResults();
 };

@@ -2,6 +2,11 @@
 
 ## Not yet released.
 
+None yet.
+
+## v2.5.0
+
+* #17 node-fast could track client metrics
 * #16 fastserve cannot be run concurrently even with different arguments
 
 ## v2.4.0

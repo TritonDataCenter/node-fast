@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2016, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -34,7 +34,9 @@ function ClientTestContext(args)
 {
 	mod_assertplus.object(args.server);
 	mod_assertplus.object(args.log);
+	mod_assertplus.optionalObject(args.collector);
 
+	this.ctc_collector = args.collector; /* artedi collector */
 	this.ctc_log = args.log;		/* bunyan logger */
 	this.ctc_closed = false;		/* already cleaned up */
 
@@ -65,6 +67,7 @@ ClientTestContext.prototype.establishConnection = function ()
 	this.ctc_client_sock = mod_net.createConnection(
 	    mod_testcommon.serverPort, mod_testcommon.serverIp);
 	this.ctc_fastclient = new mod_client.FastClient({
+	    'collector': this.ctc_collector,
 	    'log': this.ctc_log.child({ 'component': 'FastClient' }),
 	    'nRecentRequests': 100,
 	    'transport': this.ctc_client_sock

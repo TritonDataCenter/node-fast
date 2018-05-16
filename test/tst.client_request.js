@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2016, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -21,6 +21,7 @@
  * interaction.  These are defined in tst.client_generic.js.
  */
 
+var mod_artedi = require('artedi');
 var mod_assertplus = require('assert-plus');
 var mod_bunyan = require('bunyan');
 var mod_microtime = require('microtime');
@@ -73,9 +74,15 @@ function main()
 function runTestCase(testcase, callback)
 {
 	var ctc, ctr;
+	var collector;
+
+	collector = mod_artedi.createCollector({labels: {
+		service: 'tst.client_request'
+	}});
 
 	console.log('test case: %s', testcase.name);
 	ctc = new mod_testclient.ClientTestContext({
+	    'collector': collector,
 	    'server': serverSocket,
 	    'log': testLog.child({ 'testcase': testcase['name'] })
 	});
@@ -88,6 +95,17 @@ function runTestCase(testcase, callback)
 	});
 
 	ctr = ctc.makeRequest(function () {
+		if (testcase.hasOwnProperty('artediPromCheck')) {
+			/*
+			 * Function provided to check the Prometheus formatted
+			 * metrics.
+			 */
+			collector.collect(mod_artedi.FMT_PROM,
+			    function _outputMetrics(err, metrics) {
+				mod_assertplus.ok(!err);
+				testcase['artediPromCheck'](metrics);
+			});
+		}
 		testcase['clientCheck'](ctr.ctr_data, {
 		    'socket': ctc.ctc_error_sock,
 		    'client': ctc.ctc_error_client,
@@ -129,7 +147,7 @@ function runTestCase(testcase, callback)
  *                          is convenient for receiving well-formed messages
  *
  *     clientCheck   a function invoked after the test case has completed in
- *                   to verify client behavior.  It's invoked as:
+ *                   order to verify client behavior.  It's invoked as:
  *
  *                       clientCheck(data, error)
  *
@@ -140,6 +158,17 @@ function runTestCase(testcase, callback)
  *               errors  an object with properties for each possible error
  *                       emitted during the test, including "socket", "client",
  *                       and "request".
+ *
+ *     artediPromCheck  an optional function invoked after the test case has
+ *                      completed in order to verify the Prometheus-formatted
+ *                      artedi metrics for this request. It is invoked as:
+ *
+ *                          artediPromCheck(metrics)
+ *
+ *                      where
+ *
+ *                metrics  is a multi-line string containing the metrics for
+ *                         this request.
  */
 
 var mockResponders = [ {
@@ -478,6 +507,38 @@ var mockResponders = [ {
 		mod_assertplus.equal(data[i], 'string_' + i);
 	}
     }
+
+}, {
+    'name': 'artedi metrics ok for simple request',
+    'serverReply': function (socket, message, encoder) {
+	var d = ['hello world'];
+
+	assertNormalRequest(message);
+	encoder.write({
+	    'msgid': message.msgid,
+	    'status': mod_protocol.FP_STATUS_END,
+	    'data': { 'd': d }
+	});
+
+	encoder.end();
+    },
+    'artediPromCheck': function (metrics) {
+	var metricsLines;
+	mod_assertplus.string(metrics);
+	mod_assertplus.ok(metrics.length > 0);
+
+	metricsLines = metrics.trim().split(/\n/);
+	mod_assertplus.ok(metricsLines.indexOf(
+	    'fast_client_requests_completed{rpcMethod="testmethod",' +
+		'service="tst.client_request"} 1') !== -1);
+    },
+    'clientCheck': function (data, errors) {
+	mod_assertplus.ok(errors.socket === null);
+	mod_assertplus.ok(errors.client === null);
+	mod_assertplus.ok(errors.request === null);
+	mod_assertplus.deepEqual(data, ['hello world']);
+    }
+
 } ];
 
 /*

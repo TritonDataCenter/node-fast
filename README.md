@@ -104,17 +104,18 @@ function provided by the Kang library.
 
 ### Metric Collection
 
-The Fast server optionally collects some basic request metrics using
+The Fast client and server optionally collect some basic request metrics using
 [node-artedi](https://github.com/joyent/node-artedi).
 
-The metrics collected by the fast server are:
+The metrics collected are:
 
 * total request count
 * latency of requests, implemented as a histogram
 
-You can pass an artedi-style metric collector into the Fast server constructor
-to enable metric collection. An example of how to do this is included in the
-built-in demo server ("fastserve").
+You can pass an artedi-style metric collector into the Fast server or client
+constructor to enable metric collection. An example of how to do this for the
+server is included in the built-in demo server ("fastserve") and the
+benchmarking tool ("fastbench") includes a client example with metrics enabled.
 
 ### DTrace probes
 
@@ -184,6 +185,7 @@ Constructor arguments:
 
 Name              | Type         | Meaning
 ----------------- | ------------ | -------
+`collector`       | object       | [artedi](https://github.com/joyent/node-artedi)-style metric collector
 `log`             | object       | [bunyan](https://github.com/trentm/node-bunyan)-style logger
 `transport`       | `net.Socket` | underlying TCP connection to the server
 `nRecentRequests` | positive int | number of recent requests to track for debugging purposes
