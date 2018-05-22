@@ -25,7 +25,6 @@ var mod_fastdemo = require('../lib/demo_server');
 var mod_protocol = require('../lib/fast_protocol');
 var mod_testcommon = require('./common');
 
-var EventEmitter = require('events');
 var VError = require('verror');
 
 var testLog;
@@ -1122,7 +1121,9 @@ serverTestCases = [ {
 		var choice = 0;
 		var nrequests = 200;
 		var ncomplete = 0;
-		var e = new EventEmitter();
+		var barrier = mod_vasync.barrier();
+
+		barrier.start('rpcs');
 
 		var queue = mod_vasync.queuev({
 			'concurrency': 100,
@@ -1135,7 +1136,7 @@ serverTestCases = [ {
 					'maxObjectsToBuffer': 1
 				}, function () {
 					if (++ncomplete == nrequests) {
-						e.emit('complete');
+						barrier.done('rpcs');
 					}
 				});
 				qcallback();
@@ -1150,7 +1151,7 @@ serverTestCases = [ {
 		 * that just finished sending requests. This should
 		 * trigger the 'onConnsDestroyed' callback.
 		 */
-		e.on('complete', function () {
+		barrier.on('drain', function () {
 			var WAIT = 3000;
 			finish_ts = process.hrtime();
 			tctx.ts_clients.forEach(function (c) {
@@ -1183,7 +1184,6 @@ serverTestCases = [ {
 
 			callback();
 		}
-		queue.close();
 	});
     }
 } ];
