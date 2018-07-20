@@ -74,8 +74,10 @@ function fbUsageMessage()
 		fbDflConcurrency + ')',
 	    '    -d | --duration NSECONDS     Stop after NSECONDS seconds.',
 	    '    -i | --interval NSECONDS     Report every NSECONDS seconds.',
+	    '    -k | --kang-port PORT         Use PORT for kang endpoint.',
 	    '    -n | --nrequests NREQUESTS   Stop after completing ' +
 		'NREQUESTS requests.',
+	    '    -p | --artedi-port PORT       Use PORT for metrics endpoint.',
 	    ''
 	].join('\n');
 
@@ -106,7 +108,9 @@ function main()
 	});
 
 	parser = new mod_getopt.BasicParser(
-	    'c:(count)d:(duration)i:(interval)n:(nrequests)', process.argv);
+	    'c:(count)d:(duration)i:(interval)n:(nrequests)' +
+		'p:(artedi-port)k:(kang-port)',
+	     process.argv);
 	while ((option = parser.getopt()) !== undefined) {
 		switch (option.option) {
 		case 'c':
@@ -124,6 +128,14 @@ function main()
 
 		case 'n':
 			config.fbNRequests = parseOptInt(option, 1);
+			break;
+
+		case 'p':
+			config.fbArtediPort = parseOptInt(option, 1);
+			break;
+
+		case 'k':
+			config.fbKangPort = parseOptInt(option, 1);
 			break;
 
 		default:
