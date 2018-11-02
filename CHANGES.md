@@ -4,18 +4,20 @@
 
 None yet.
 
-## v3.0.0
+## v2.6.0
 
 * `fast_client_request_time_ms` became `fast_client_request_time_seconds` and is
   now measured in seconds rather than milliseconds.
-* `fast_server_request_time_ms` became `fast_server_request_time_seconds` and is
+* `fast_request_time_ms` became `fast_server_request_time_seconds` and is
   now measured in seconds rather than milliseconds.
-* Switched to artedi v2 which requires histograms to use fixed buckets. Default
-  buckets are generated via artedi.logLinearBuckets(10, -1, 3, 5). See:
-  joyent/node-artedi#17 for more details. Data generated with previous versions
-  of node-fast are likely invalid. Dashboards/queries which use the new
-  `fast_*_request_time_seconds` histograms should restrict results using the
-  `{buckets_version="1"}` label when performing queries.
+* Add support for artedi v2 which requires histograms to use fixed buckets.
+  When the collector passed is an artedi v2 collector, default buckets are
+  generated via artedi.logLinearBuckets(10, -1, 3, 5). See: joyent/node-artedi#17
+  for more details. Data generated with artedi v1 collectors are likely
+  invalid (and have been with previous releases as well). Dashboards/queries for
+  services which pass v2 collectors to node-fast, should restrict results using
+  the `{buckets_version="1"}` label when performing Prometheus queries on this
+  data.
 
 ## v2.5.0
 
