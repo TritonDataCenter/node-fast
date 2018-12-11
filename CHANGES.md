@@ -4,6 +4,10 @@
 
 None yet.
 
+## v2.6.1
+
+* #22 Fix copy-paste bug in fast_server module
+
 ## v2.6.0
 
 * `fast_client_request_time_ms` became `fast_client_request_time_seconds` and is

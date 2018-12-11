@@ -168,6 +168,7 @@ function runTestCase(testcase, callback)
 	});
 	tctx.ts_socket = mod_net.createServer({ 'allowHalfOpen': true });
 	tctx.ts_server = new mod_fast.FastServer({
+	    'collector': tctx.ts_collector,
 	    'log': tctx.ts_log.child({ 'component': 'FastServer' }),
 	    'server': tctx.ts_socket
 	});
@@ -1011,7 +1012,7 @@ serverTestCases = [ {
     'run': function (tctx, callback) {
 	function doBadRpc(client, cb) {
 		client.rpcBufferAndCallback({
-			'rpcmethod': '',
+			'rpcmethod': 'nonexistentrpcmethod',
 			'rpcargs': [],
 			'maxObjectsToBuffer': 0
 		}, function (err, data, ndata) {
