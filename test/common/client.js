@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -35,17 +35,30 @@ function ClientTestContext(args)
 	mod_assertplus.object(args.server);
 	mod_assertplus.object(args.log);
 	mod_assertplus.optionalObject(args.collector);
+	mod_assertplus.optionalNumber(args.client_crc_mode);
+	mod_assertplus.optionalNumber(args.server_decoder_crc_mode);
 
 	this.ctc_collector = args.collector; /* artedi collector */
 	this.ctc_log = args.log;		/* bunyan logger */
 	this.ctc_closed = false;		/* already cleaned up */
 
+	/*
+	 * Settings to test the CRC modes added to support transitioning off the
+	 * buggy node-crc@0.3.0 dependency.
+	 */
+	this.client_crc_mode = args.client_crc_mode ||
+	    mod_protocol.CRC_MODE_NEW;
+	this.server_decoder_crc_mode = args.server_decoder_crc_mode ||
+	    mod_protocol.CRC_MODE_NEW;
+	this.server_encoder_crc_mode = args.server_encoder_crc_mode ||
+	    mod_protocol.CRC_MODE_NEW;
+
 	/* server handles */
 	this.ctc_server = args.server;	/* server listening socket */
 	this.ctc_server_sock = null;	/* server-side connection to client */
-	this.ctc_server_message = null;	/* first message received by server */
-	this.ctc_server_decoder = null;	/* decoder piped from ctc_server_sock */
-	this.ctc_server_encoder = null;	/* encoder piped to ctc_server_sock */
+	this.ctc_server_message = null; /* first message received by server */
+	this.ctc_server_decoder = null; /* decoder piped from ctc_server_sock */
+	this.ctc_server_encoder = null; /* encoder piped to ctc_server_sock */
 
 	/* client handles */
 	this.ctc_client_sock = null;	/* client TCP socket */
@@ -70,7 +83,8 @@ ClientTestContext.prototype.establishConnection = function ()
 	    'collector': this.ctc_collector,
 	    'log': this.ctc_log.child({ 'component': 'FastClient' }),
 	    'nRecentRequests': 100,
-	    'transport': this.ctc_client_sock
+	    'transport': this.ctc_client_sock,
+	    'crc_mode': this.client_crc_mode
 	});
 
 	this.ctc_fastclient.on('error', function (err) {
@@ -88,8 +102,10 @@ ClientTestContext.prototype.establishConnection = function ()
 		sock.pipe(self.ctc_server_decoder);
 	});
 
-	this.ctc_server_encoder = new mod_protocol.FastMessageEncoder();
-	this.ctc_server_decoder = new mod_protocol.FastMessageDecoder();
+	this.ctc_server_encoder =
+	    new mod_protocol.FastMessageEncoder(this.server_encoder_crc_mode);
+	this.ctc_server_decoder =
+	    new mod_protocol.FastMessageDecoder(this.server_decoder_crc_mode);
 };
 
 /*
@@ -145,7 +161,7 @@ ClientTestContext.prototype.serverReply = function (message, options)
 };
 
 /*
- * Direct the client to execute an RPC request.  Returns a ClientTestRequest,
+ * Direct the client to execute an RPC request.	 Returns a ClientTestRequest,
  * which keeps track of events emitted on the request.
  */
 ClientTestContext.prototype.makeRequest = function (callback)
@@ -201,7 +217,7 @@ ClientTestContext.prototype.makeRequestWithOptions =
 };
 
 /*
- * Clean up the client and server connections.  This does not close the
+ * Clean up the client and server connections.	This does not close the
  * listening socket.
  */
 ClientTestContext.prototype.cleanup = function ()

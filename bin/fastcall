@@ -7,7 +7,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -20,6 +20,7 @@ var mod_assertplus = require('assert-plus');
 var mod_bunyan = require('bunyan');
 var mod_cmdutil = require('cmdutil');
 var mod_fast = require('../lib/fast_client');
+var mod_protocol = require('../lib/fast_protocol');
 var mod_getopt = require('posix-getopt');
 var mod_net = require('net');
 
@@ -153,7 +154,8 @@ function fastcall(args, callback)
 		fastconn = new mod_fast.FastClient({
 		    'log': log,
 		    'transport': conn,
-		    'nRecentRequests': 10
+		    'nRecentRequests': 10,
+		    'crc_mode': mod_protocol.CRC_MODE_OLD
 		});
 
 		fastconn.on('error', function (err) {

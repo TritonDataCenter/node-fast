@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2016, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -124,7 +124,8 @@ function runDuplicateResponseTest(ctc, firstIsError, secondStatus, callback)
 		    'status': secondStatus,
 		    'data': secondStatus === mod_protocol.FP_STATUS_ERROR ?
 			mod_testcommon.dummyResponseError :
-			mod_testcommon.dummyResponseData
+			mod_testcommon.dummyResponseData,
+		    'crc_mode': mod_protocol.CRC_MODE_NEW
 		});
 
 		/*
@@ -183,7 +184,8 @@ function runClientFailureTest(ctc, doFail, callback)
 			ctc.ctc_server_encoder.write({
 			    'msgid': message.msgid,
 			    'status': mod_protocol.FP_STATUS_DATA,
-			    'data': mod_testcommon.dummyResponseData
+			    'data': mod_testcommon.dummyResponseData,
+			    'crc_mode': mod_protocol.CRC_MODE_NEW
 			});
 		});
 	    },
@@ -336,7 +338,8 @@ var test_cases = [ {
 	ctc.ctc_server_encoder.end({
 	    'msgid': 0x7,
 	    'status': mod_protocol.FP_STATUS_ERROR,
-	    'data': mod_testcommon.dummyResponseError
+	    'data': mod_testcommon.dummyResponseError,
+	    'crc_mode': mod_protocol.CRC_MODE_NEW
 	});
 
 	ctc.ctc_fastclient.on('error', function (err) {
@@ -363,7 +366,8 @@ var test_cases = [ {
 		ctc.ctc_server_encoder.end({
 		    'msgid': message.msgid,
 		    'status': mod_protocol.FP_STATUS_END,
-		    'data': { 'd': [ true, null, 7 ] }
+		    'data': { 'd': [ true, null, 7 ] },
+		    'crc_mode': mod_protocol.CRC_MODE_NEW
 		});
 	});
 

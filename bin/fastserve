@@ -7,7 +7,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -21,6 +21,7 @@ var mod_cmdutil = require('cmdutil');
 var mod_getopt = require('posix-getopt');
 var mod_fastdemo = require('../lib/demo_server');
 var mod_fastserver = require('../lib/fast_server');
+var mod_protocol = require('../lib/fast_protocol');
 var mod_jsprim = require('jsprim');
 var mod_kang = require('kang');
 var mod_net = require('net');
@@ -136,7 +137,8 @@ function fastDemoServer(args)
 	fastserver = new mod_fastserver.FastServer({
 	    'log': log,
 	    'collector': collector,
-	    'server': sock
+	    'server': sock,
+	    'crc_mode': mod_protocol.CRC_MODE_OLD_NEW
 	});
 
 	mod_fastdemo.demoRpcs().forEach(function (r) {
