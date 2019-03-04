@@ -125,7 +125,7 @@ function runDuplicateResponseTest(ctc, firstIsError, secondStatus, callback)
 		    'data': secondStatus === mod_protocol.FP_STATUS_ERROR ?
 			mod_testcommon.dummyResponseError :
 			mod_testcommon.dummyResponseData,
-		    'crc_mode': mod_protocol.CRC_MODE_NEW
+		    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
 		});
 
 		/*
@@ -185,7 +185,7 @@ function runClientFailureTest(ctc, doFail, callback)
 			    'msgid': message.msgid,
 			    'status': mod_protocol.FP_STATUS_DATA,
 			    'data': mod_testcommon.dummyResponseData,
-			    'crc_mode': mod_protocol.CRC_MODE_NEW
+			    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
 			});
 		});
 	    },
@@ -339,7 +339,7 @@ var test_cases = [ {
 	    'msgid': 0x7,
 	    'status': mod_protocol.FP_STATUS_ERROR,
 	    'data': mod_testcommon.dummyResponseError,
-	    'crc_mode': mod_protocol.CRC_MODE_NEW
+	    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
 	});
 
 	ctc.ctc_fastclient.on('error', function (err) {
@@ -367,7 +367,7 @@ var test_cases = [ {
 		    'msgid': message.msgid,
 		    'status': mod_protocol.FP_STATUS_END,
 		    'data': { 'd': [ true, null, 7 ] },
-		    'crc_mode': mod_protocol.CRC_MODE_NEW
+		    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
 		});
 	});
 

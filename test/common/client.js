@@ -47,11 +47,11 @@ function ClientTestContext(args)
 	 * buggy node-crc@0.3.0 dependency.
 	 */
 	this.client_crc_mode = args.client_crc_mode ||
-	    mod_protocol.CRC_MODE_NEW;
+	    mod_protocol.FAST_CHECKSUM_V2;
 	this.server_decoder_crc_mode = args.server_decoder_crc_mode ||
-	    mod_protocol.CRC_MODE_NEW;
+	    mod_protocol.FAST_CHECKSUM_V2;
 	this.server_encoder_crc_mode = args.server_encoder_crc_mode ||
-	    mod_protocol.CRC_MODE_NEW;
+	    mod_protocol.FAST_CHECKSUM_V2;
 
 	/* server handles */
 	this.ctc_server = args.server;	/* server listening socket */

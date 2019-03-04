@@ -155,7 +155,7 @@ function fastcall(args, callback)
 		    'log': log,
 		    'transport': conn,
 		    'nRecentRequests': 10,
-		    'crc_mode': mod_protocol.CRC_MODE_OLD
+		    'crc_mode': mod_protocol.FAST_CHECKSUM_V1
 		});
 
 		fastconn.on('error', function (err) {

@@ -138,7 +138,7 @@ function fastDemoServer(args)
 	    'log': log,
 	    'collector': collector,
 	    'server': sock,
-	    'crc_mode': mod_protocol.CRC_MODE_OLD_NEW
+	    'crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2
 	});
 
 	mod_fastdemo.demoRpcs().forEach(function (r) {

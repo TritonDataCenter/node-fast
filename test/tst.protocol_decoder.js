@@ -46,7 +46,7 @@ function main()
 
 function runTestCase(testcase, callback)
 {
-	var crc_mode = testcase['crc_mode'] || mod_protocol.CRC_MODE_NEW;
+	var crc_mode = testcase['crc_mode'] || mod_protocol.FAST_CHECKSUM_V2;
 	var decoder = new mod_protocol.FastMessageDecoder(crc_mode);
 	var data = [];
 	var error = null;
@@ -102,7 +102,7 @@ test_cases = [ {
 	buf.write(sample_data, mod_protocol.FP_OFF_DATA);
 	return (buf);
     },
-    'crc_mode': mod_protocol.CRC_MODE_OLD,
+    'crc_mode': mod_protocol.FAST_CHECKSUM_V1,
     'check': function (error, data) {
 	mod_assertplus.ok(error === null);
 	mod_assertplus.equal(data.length, 1);
@@ -129,7 +129,7 @@ test_cases = [ {
 	buf.write(sample_data, mod_protocol.FP_OFF_DATA);
 	return (buf);
     },
-    'crc_mode': mod_protocol.CRC_MODE_OLD_NEW,
+    'crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2,
     'check': function (error, data) {
 	mod_assertplus.ok(error === null);
 	mod_assertplus.equal(data.length, 1);
@@ -156,7 +156,7 @@ test_cases = [ {
 	buf.write(sample_data, mod_protocol.FP_OFF_DATA);
 	return (buf);
     },
-    'crc_mode': mod_protocol.CRC_MODE_OLD_NEW,
+    'crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2,
     'check': function (error, data) {
 	mod_assertplus.ok(error === null);
 	mod_assertplus.equal(data.length, 1);
@@ -183,7 +183,7 @@ test_cases = [ {
 	buf.write(sample_data, mod_protocol.FP_OFF_DATA);
 	return (buf);
     },
-    'crc_mode': mod_protocol.CRC_MODE_NEW,
+    'crc_mode': mod_protocol.FAST_CHECKSUM_V2,
     'check': function (error, data) {
 	mod_assertplus.ok(error === null);
 	mod_assertplus.equal(data.length, 1);
@@ -219,11 +219,11 @@ test_cases = [ {
 }, {
     'name': 'DATA message with maximum msgid',
     'input': function () {
-	var buf = makeSampleMessage(mod_protocol.CRC_MODE_NEW);
+	var buf = makeSampleMessage(mod_protocol.FAST_CHECKSUM_V2);
 	buf.writeUInt32BE(mod_protocol.FP_MSGID_MAX, mod_protocol.FP_OFF_MSGID);
 	return (buf);
     },
-    'crc_mode': mod_protocol.CRC_MODE_NEW,
+    'crc_mode': mod_protocol.FAST_CHECKSUM_V2,
     'check': function (error, data) {
 	mod_assertplus.ok(error === null);
 	mod_assertplus.equal(data.length, 1);
@@ -418,7 +418,7 @@ test_cases = [ {
 }, {
     'name': 'bad CRC 1',
     'input': function () {
-	var buf = makeSampleMessage(mod_protocol.CRC_MODE_NEW);
+	var buf = makeSampleMessage(mod_protocol.FAST_CHECKSUM_V2);
 	mod_assertplus.ok(
 	    buf.readUInt32BE(mod_protocol.FP_OFF_CRC) != 0xdeadbeef);
 	buf.writeUInt32BE(0xdeadbeef, mod_protocol.FP_OFF_CRC);
@@ -436,13 +436,13 @@ test_cases = [ {
 }, {
     'name': 'bad CRC 2',
     'input': function () {
-	var buf = makeSampleMessage(mod_protocol.CRC_MODE_OLD);
+	var buf = makeSampleMessage(mod_protocol.FAST_CHECKSUM_V1);
 	mod_assertplus.ok(
 	    buf.readUInt32BE(mod_protocol.FP_OFF_CRC) != 0xdeadbeef);
 	buf.writeUInt32BE(0xdeadbeef, mod_protocol.FP_OFF_CRC);
 	return (buf);
     },
-    'crc_mode': mod_protocol.CRC_MODE_OLD,
+    'crc_mode': mod_protocol.FAST_CHECKSUM_V1,
     'check': function (error, data) {
 	mod_assertplus.equal(data.length, 0);
 	mod_assertplus.ok(error instanceof Error);

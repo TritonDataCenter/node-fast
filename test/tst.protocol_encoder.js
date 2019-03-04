@@ -42,17 +42,17 @@ function main()
 }
 
 function useOldCrc(testCase) {
-	testCase.input.crc_mode = mod_protocol.CRC_MODE_OLD;
+	testCase.input.crc_mode = mod_protocol.FAST_CHECKSUM_V1;
 	return (testCase);
 }
 
 function useNewCrc(testCase) {
-	testCase.input.crc_mode = mod_protocol.CRC_MODE_NEW;
+	testCase.input.crc_mode = mod_protocol.FAST_CHECKSUM_V2;
 	return (testCase);
 }
 
 function useOldNewCrc(testCase) {
-	testCase.input.crc_mode = mod_protocol.CRC_MODE_OLD_NEW;
+	testCase.input.crc_mode = mod_protocol.FAST_CHECKSUM_V1_V2;
 	return (testCase);
 }
 
@@ -70,7 +70,7 @@ test_cases = [ {
 	mod_assertplus.equal(parsed.pm_data.toString('utf8'), expected);
 	mod_assertplus.equal(parsed.pm_msgid, 1);
 	mod_assertplus.equal(parsed.pm_status, mod_protocol.FP_STATUS_DATA);
-	if (parsed.pm_crc_mode === mod_protocol.CRC_MODE_OLD) {
+	if (parsed.pm_crc_mode === mod_protocol.FAST_CHECKSUM_V1) {
 		mod_assertplus.equal(parsed.pm_crc, 10980);
 	} else {
 		mod_assertplus.equal(parsed.pm_crc, 7500);

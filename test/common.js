@@ -93,7 +93,7 @@ function writeMessageForEncodedData(buf, msgid, status, dataenc, msgoffset,
     crc_mode)
 {
 	var crc, datalen;
-	if (crc_mode && crc_mode === mod_protocol.CRC_MODE_OLD) {
+	if (crc_mode && crc_mode === mod_protocol.FAST_CHECKSUM_V1) {
 		crc = mod_old_crc.crc16(dataenc);
 	} else {
 		crc = mod_crc.crc16(dataenc);
