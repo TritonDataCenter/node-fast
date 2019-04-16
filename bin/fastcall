@@ -19,16 +19,17 @@ var VError = require('verror');
 var mod_assertplus = require('assert-plus');
 var mod_bunyan = require('bunyan');
 var mod_cmdutil = require('cmdutil');
-var mod_fast = require('../lib/fast_client');
-var mod_protocol = require('../lib/fast_protocol');
+var mod_fast = require('../lib/fast');
 var mod_getopt = require('posix-getopt');
 var mod_net = require('net');
 
 var OPTS = {
 	'a': 'abandon the RPC request after issuing it ' +
-		'via FastClientRequest#abandon',
+	    'via FastClientRequest#abandon',
 	'c': 'do not close the socket used to talk ' +
-		'to the FastServer until SIGINT'
+	    'to the FastServer until SIGINT',
+	'm': 'optional CRC compatibility mode. One of: FAST_CHECKSUM_V1 or ' +
+	    'FAST_CHECKSUM_V2. Default: FAST_CHECKSUM_V2.'
 };
 
 function main()
@@ -39,22 +40,26 @@ function main()
 	var timeout = null;
 
 	mod_cmdutil.configure({
-	    'synopses': [ '[OPTIONS] HOST PORT METHOD ARGS' ],
+	    'synopses': [ '[OPTIONS] HOST PORT METHOD ARGS [CRC_MODE]' ],
 	    'usageMessage': [
 		'    OPTIONS',
 		'        -a,--abandon-immediately   ' + OPTS['a'],
 		'        -c,--leave-conn-open       ' + OPTS['c'],
-	        '    HOST     DNS name or IP address for remote server',
+		'        -m,--crc-mode              ' + OPTS['m'],
+		'    HOST     DNS name or IP address for remote server',
 		'    PORT     TCP port for remote server',
 		'    METHOD   Name of remote RPC method call',
 		'    ARGS     JSON-encoded arguments for RPC method call'
+
 	    ].join('\n')
 	});
 	mod_cmdutil.exitOnEpipe();
 
+	var crcMode = mod_fast.FAST_CHECKSUM_V2;
+
 	var option;
 	var parser = new mod_getopt.BasicParser('a(abandon-immediately)' +
-	    'c(leave-conn-open)', process.argv);
+	    'c(leave-conn-open)m:(crc-mode)', process.argv);
 	while ((option = parser.getopt()) !== undefined) {
 		switch (option.option) {
 			case 'c':
@@ -62,6 +67,9 @@ function main()
 				break;
 			case 'a':
 				doabandon = true;
+				break;
+			case 'm':
+				crcMode = parseOptCrcMode(option);
 				break;
 			default:
 				mod_assertplus.equal('?', option.option);
@@ -99,7 +107,8 @@ function main()
 	    'rpcargs': rpcargs,
 	    'timeout': timeout,
 	    'abandonImmediately': doabandon,
-	    'leaveConnOpen': leaveconnopen
+	    'leaveConnOpen': leaveconnopen,
+	    'crc_mode': crcMode
 	}, function (err, result) {
 		if (err) {
 			mod_cmdutil.warn(err);
@@ -107,10 +116,23 @@ function main()
 	});
 }
 
+function parseOptCrcMode(option)
+{
+	if (option.optarg !== 'FAST_CHECKSUM_V1' &&
+	    option.optarg !== 'FAST_CHECKSUM_V2') {
+		mod_cmdutil.usage('invalid CRC mode: %s', option.optarg);
+		return (-1);
+	} else if (option.optarg === 'FAST_CHECKSUM_V1') {
+		return (mod_fast.FAST_CHECKSUM_V1);
+	} else {
+		return (mod_fast.FAST_CHECKSUM_V2);
+	}
+}
+
 function fastcall(args, callback)
 {
 	var log, conn;
-	var rpcmethod, rpcargs, timeout, doabandon, leaveconnopen;
+	var rpcmethod, rpcargs, timeout, doabandon, leaveconnopen, crc_mode;
 
 	mod_assertplus.object(args, 'args');
 	mod_assertplus.string(args.host, 'args.host');
@@ -120,12 +142,14 @@ function fastcall(args, callback)
 	mod_assertplus.array(args.rpcargs, 'args.rpcargs');
 	mod_assertplus.bool(args.abandonImmediately, 'args.abandonImmediately');
 	mod_assertplus.bool(args.leaveConnOpen, 'args.leaveConnOpen');
+	mod_assertplus.number(args.crc_mode, 'args.crc_mode');
 
 	rpcmethod = args.rpcmethod;
 	rpcargs = args.rpcargs;
 	timeout = args.timeout;
 	doabandon = args.abandonImmediately;
 	leaveconnopen = args.leaveConnOpen;
+	crc_mode = args.crc_mode;
 
 	log = new mod_bunyan({
 	    'name': 'fastcall',
@@ -155,7 +179,7 @@ function fastcall(args, callback)
 		    'log': log,
 		    'transport': conn,
 		    'nRecentRequests': 10,
-		    'crc_mode': mod_protocol.FAST_CHECKSUM_V1
+		    'crc_mode': crc_mode
 		});
 
 		fastconn.on('error', function (err) {

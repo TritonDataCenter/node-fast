@@ -46,5 +46,6 @@ test: | $(CATEST)
 
 $(CATEST): deps/catest/.git
 
-include ./Makefile.targ
+include ./tools/mk/Makefile.deps
+include ./tools/mk/Makefile.targ
 include ./test/compat/Makefile.compat.targ

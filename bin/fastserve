@@ -20,8 +20,7 @@ var mod_bunyan = require('bunyan');
 var mod_cmdutil = require('cmdutil');
 var mod_getopt = require('posix-getopt');
 var mod_fastdemo = require('../lib/demo_server');
-var mod_fastserver = require('../lib/fast_server');
-var mod_protocol = require('../lib/fast_protocol');
+var mod_fast = require('../lib/fast');
 var mod_jsprim = require('jsprim');
 var mod_kang = require('kang');
 var mod_net = require('net');
@@ -32,7 +31,10 @@ var mod_util = require('util');
 var OPTS = {
     '-p,--port': 'fast RPC listening port(default: 2030)',
     '-m,--mon-port': 'monitoring server listening port (default: port+800)',
-    '-q,--quiesce': 'enable quiesce (default: false)'
+    '-q,--quiesce': 'enable quiesce (default: false)',
+    '-c,--crc-mode': 'CRC compatibility mode. One of: FAST_CHECKSUM_V1, ' +
+	'FAST_CHECKSUM_V2, or FAST_CHECKSUM_V1_V2 (default: ' +
+	'FAST_CHECKSUM_V1_V2).'
 };
 
 /* construct the usage message */
@@ -48,7 +50,8 @@ function main()
 	/* default configuration values - monitorPort is set later */
 	var config = {
 	    'quiesce': false,
-	    'fastPort': 2030
+	    'fastPort': 2030,
+	    'crcMode': mod_fast.FAST_CHECKSUM_V1_V2
 	};
 
 	mod_cmdutil.configure({
@@ -58,7 +61,7 @@ function main()
 	mod_cmdutil.exitOnEpipe();
 
 	var parser = new mod_getopt.BasicParser('p:(port)m:(mon-port)' +
-	    'q(quiesce)', process.argv);
+	    'q(quiesce)c:(crc-mode)', process.argv);
 	while ((option = parser.getopt()) !== undefined) {
 		switch (option.option) {
 			case 'q':
@@ -71,6 +74,9 @@ function main()
 			case 'm':
 				config.monitorPort =
 				    mod_jsprim.parseInteger(option.optarg);
+				break;
+			case 'c':
+				config.crcMode = parseOptCrcMode(option);
 				break;
 			default:
 				mod_assertplus.equal('?', option.option);
@@ -111,6 +117,22 @@ function main()
 	fastDemoServer(config);
 }
 
+function parseOptCrcMode(option)
+{
+	if (option.optarg !== 'FAST_CHECKSUM_V1' &&
+	    option.optarg !== 'FAST_CHECKSUM_V2' &&
+	    option.optarg !== 'FAST_CHECKSUM_V1_V2') {
+		mod_cmdutil.usage('invalid CRC mode: ' + option.optarg);
+		return (-1);
+	} else if (option.optarg === 'FAST_CHECKSUM_V1') {
+		return (mod_fast.FAST_CHECKSUM_V1);
+	} else if (option.optarg === 'FAST_CHECKSUM_V2') {
+		return (mod_fast.FAST_CHECKSUM_V2);
+	} else {
+		return (mod_fast.FAST_CHECKSUM_V1_V2);
+	}
+}
+
 function fastDemoServer(args)
 {
 	var fastPort, log, sock, collector, fastserver;
@@ -120,6 +142,7 @@ function fastDemoServer(args)
 	mod_assertplus.number(args.fastPort, 'args.fastPort');
 	mod_assertplus.number(args.monitorPort, 'args.monitorPort');
 	mod_assertplus.bool(args.quiesce, 'args.quiesce');
+	mod_assertplus.number(args.crcMode, 'args.crcMode');
 
 	collector = mod_artedi.createCollector({
 	    'labels': {
@@ -134,11 +157,11 @@ function fastDemoServer(args)
 
 	log.info('starting fast server');
 	sock = mod_net.createServer({ 'allowHalfOpen': true });
-	fastserver = new mod_fastserver.FastServer({
+	fastserver = new mod_fast.FastServer({
 	    'log': log,
 	    'collector': collector,
 	    'server': sock,
-	    'crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2
+	    'crc_mode': args.crcMode
 	});
 
 	mod_fastdemo.demoRpcs().forEach(function (r) {
