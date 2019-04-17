@@ -11,14 +11,8 @@
 /*
  * test/tst.crc_mode.js: tests for CRC compatibility mode validations
  *
- * This file contains a test runner (runTestCase) that executes test cases
- * following a very prescribed form, where a client connects to the server, the
- * server handles the request (often in surprising ways), and the client reports
- * some number of errors.  This allows us to exercise a lot of different cases,
- * including normal, valid RPC calls, RPC calls that return lots of data, and
- * various edge cases like invalid messages and unexpected end-of-stream events.
- * There are some test cases that require more control over client-server
- * interaction.  These are defined in tst.client_generic.js.
+ * Tests for CRC compatibility mode validations. For more details about this see
+ * the fast_protocol module documentation.
  */
 
 var mod_assertplus = require('assert-plus');
