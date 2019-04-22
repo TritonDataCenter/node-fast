@@ -28,8 +28,7 @@ var OPTS = {
 	    'via FastClientRequest#abandon',
 	'c': 'do not close the socket used to talk ' +
 	    'to the FastServer until SIGINT',
-	'm': 'optional CRC compatibility mode. One of: FAST_CHECKSUM_V1 or ' +
-	    'FAST_CHECKSUM_V2. Default: FAST_CHECKSUM_V2.'
+	'm': 'optional CRC compatibility mode. One of: v1 or v2. Default: v2.'
 };
 
 function main()
@@ -118,11 +117,11 @@ function main()
 
 function parseOptCrcMode(option)
 {
-	if (option.optarg !== 'FAST_CHECKSUM_V1' &&
-	    option.optarg !== 'FAST_CHECKSUM_V2') {
+	if (option.optarg !== 'v1' && option.optarg !== 'v2') {
 		mod_cmdutil.usage('invalid CRC mode: %s', option.optarg);
 		return (-1);
-	} else if (option.optarg === 'FAST_CHECKSUM_V1') {
+
+	} else if (option.optarg === 'v1') {
 		return (mod_fast.FAST_CHECKSUM_V1);
 	} else {
 		return (mod_fast.FAST_CHECKSUM_V2);

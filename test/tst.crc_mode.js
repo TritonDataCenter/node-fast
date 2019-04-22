@@ -236,12 +236,6 @@ function fastMessageEncodeOk(l, cb) {
 		mod_protocol.fastMessageEncode(msg1, mod_fast.FAST_CHECKSUM_V2);
 		mod_protocol.fastMessageEncode(msg2, mod_fast.FAST_CHECKSUM_V2);
 		mod_protocol.fastMessageEncode(msg3, mod_fast.FAST_CHECKSUM_V2);
-		/*
-		 * Also test that the crc_mode specified in the message takes
-		 * precedence
-		 */
-		mod_protocol.fastMessageEncode(msg2, 45);
-		mod_protocol.fastMessageEncode(msg3, 45);
 		mod_assertplus.ok(true);
 	} catch (ex) {
 		mod_assertplus.fail('fastMessageEncode failed with valid ' +
@@ -269,6 +263,12 @@ function fastMessageEncodeFail(l, cb) {
 	    'status': mod_protocol.FP_STATUS_DATA,
 	    'data': [ 'hello', 'world' ],
 	    'crc_mode': 50
+	};
+	var msg4 = {
+	    'msgid': 1,
+	    'status': mod_protocol.FP_STATUS_DATA,
+	    'data': [ 'hello', 'world' ],
+	    'crc_mode': mod_fast.FAST_CHECKSUM_V2
 	};
 
 	try {
@@ -348,6 +348,16 @@ function fastMessageEncodeFail(l, cb) {
 		mod_protocol.fastMessageEncode(msg3, mod_fast.FAST_CHECKSUM_V2);
 		mod_assertplus.fail('fastMessageEncode allowed invalid ' +
 		    'CRC mode 50');
+		cb();
+		return;
+	} catch (ex) {
+		mod_assertplus.ok(true);
+	}
+
+	try {
+		mod_protocol.fastMessageEncode(msg4, 45);
+		mod_assertplus.fail('fastMessageEncode allowed invalid ' +
+		    'default CRC mode 45');
 		cb();
 		return;
 	} catch (ex) {
