@@ -44,6 +44,8 @@ var fbDflReportingInterval = 5;
 var fbDflKangPort = 16520;
 /* default port for artedi server */
 var fbDflArtediPort = 16521;
+/* default CRC compatibility mode */
+var crcMode = mod_fast.FAST_CHECKSUM_V2;
 
 /*
  * The Big Theory Statement in lib/fast_server.js explains that completing N
@@ -74,10 +76,12 @@ function fbUsageMessage()
 		fbDflConcurrency + ')',
 	    '    -d | --duration NSECONDS     Stop after NSECONDS seconds.',
 	    '    -i | --interval NSECONDS     Report every NSECONDS seconds.',
-	    '    -k | --kang-port PORT         Use PORT for kang endpoint.',
+	    '    -k | --kang-port PORT        Use PORT for kang endpoint.',
 	    '    -n | --nrequests NREQUESTS   Stop after completing ' +
 		'NREQUESTS requests.',
-	    '    -p | --artedi-port PORT       Use PORT for metrics endpoint.',
+	    '    -p | --artedi-port PORT      Use PORT for metrics endpoint.',
+	    '    -m | --crc-mode MODE         Optional CRC compatibility mode.',
+	    '                                 One of: v1 or v2. Default: v2.',
 	    ''
 	].join('\n');
 
@@ -97,7 +101,8 @@ function main()
 	    'fbReportingInterval': fbDflReportingInterval * 1000,
 	    'fbConcurrency': fbDflConcurrency,
 	    'fbArtediPort': fbDflArtediPort,
-	    'fbKangPort': fbDflKangPort
+	    'fbKangPort': fbDflKangPort,
+	    'crcMode': crcMode
 	};
 
 	mod_cmdutil.configure({
@@ -109,7 +114,7 @@ function main()
 
 	parser = new mod_getopt.BasicParser(
 	    'c:(count)d:(duration)i:(interval)n:(nrequests)' +
-		'p:(artedi-port)k:(kang-port)',
+		'p:(artedi-port)k:(kang-port)m:(crc-mode)',
 	     process.argv);
 	while ((option = parser.getopt()) !== undefined) {
 		switch (option.option) {
@@ -136,6 +141,10 @@ function main()
 
 		case 'k':
 			config.fbKangPort = parseOptInt(option, 1);
+			break;
+
+		case 'm':
+			config.crcMode = parseOptCrcMode(option);
 			break;
 
 		default:
@@ -190,6 +199,19 @@ function parseOptInt(option, min)
 	return (v);
 }
 
+function parseOptCrcMode(option)
+{
+	switch (option.optarg) {
+	case 'v1':
+		return (mod_fast.FAST_CHECKSUM_V1);
+	case 'v2':
+		return (mod_fast.FAST_CHECKSUM_V2);
+	default:
+		mod_cmdutil.usage('invalid CRC mode: %s', option.optarg);
+		return (-1);
+	}
+}
+
 function fastbench(config)
 {
 	var collector;
@@ -237,7 +259,8 @@ function fastbench(config)
 			    'collector': collector,
 			    'log': log,
 			    'transport': csock,
-			    'nRecentRequests': 5
+			    'nRecentRequests': 5,
+			    'crc_mode': config.crcMode
 			});
 
 			bencher.fb_fastclients.push(fastclient);

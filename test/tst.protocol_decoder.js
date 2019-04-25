@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2016, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -14,6 +14,7 @@
 
 var mod_assertplus = require('assert-plus');
 var mod_cmdutil = require('cmdutil');
+var mod_old_crc = require('oldcrc');
 var mod_crc = require('crc');
 var mod_extsprintf = require('extsprintf');
 var mod_path = require('path');
@@ -45,7 +46,8 @@ function main()
 
 function runTestCase(testcase, callback)
 {
-	var decoder = new mod_protocol.FastMessageDecoder();
+	var crc_mode = testcase['crc_mode'] || mod_protocol.FAST_CHECKSUM_V2;
+	var decoder = new mod_protocol.FastMessageDecoder(crc_mode);
 	var data = [];
 	var error = null;
 
@@ -71,6 +73,7 @@ function runTestCase(testcase, callback)
 
 var sample_object = { 'd': [ { 'hello': 'world' } ] };
 var sample_data = JSON.stringify(sample_object);
+var sample_old_crc = mod_old_crc.crc16(sample_data);
 var sample_crc = mod_crc.crc16(sample_data);
 
 var sample_error = { 'd': { 'name': 'AnError', 'message': 'boom!' } };
@@ -78,9 +81,90 @@ var sample_error = { 'd': { 'name': 'AnError', 'message': 'boom!' } };
 /* This object winds up being about 28MB encoded as JSON. */
 var big_object = { 'd': [ mod_testcommon.makeBigObject(10, 6) ] };
 var big_data = JSON.stringify(big_object);
-var big_crc = mod_crc.crc16(big_data);
+var big_crc = mod_old_crc.crc16(big_data);
 
 test_cases = [ {
+    'name': 'basic DATA message (old CRC calculaton)',
+    'input': function () {
+	/*
+	 * The first few of these test cases hardcode protocol values to make
+	 * sure these constants don't break silently on us (e.g., checking null
+	 * against undefined because FP_OFF_TYPE has been deleted).  Later,
+	 * we'll just use the constants for clarity.
+	 */
+	var buf = new Buffer(mod_protocol.FP_HEADER_SZ + sample_data.length);
+	buf.writeUInt8(0x1, mod_protocol.FP_OFF_VERSION);
+	buf.writeUInt8(0x1, mod_protocol.FP_OFF_TYPE);
+	buf.writeUInt8(0x1, mod_protocol.FP_OFF_STATUS);
+	buf.writeUInt32BE(0xbadcafe, mod_protocol.FP_OFF_MSGID);
+	buf.writeUInt32BE(sample_old_crc, mod_protocol.FP_OFF_CRC);
+	buf.writeUInt32BE(sample_data.length, mod_protocol.FP_OFF_DATALEN);
+	buf.write(sample_data, mod_protocol.FP_OFF_DATA);
+	return (buf);
+    },
+    'crc_mode': mod_protocol.FAST_CHECKSUM_V1,
+    'check': function (error, data) {
+	mod_assertplus.ok(error === null);
+	mod_assertplus.equal(data.length, 1);
+	mod_assertplus.equal(data[0].msgid, 0xbadcafe);
+	mod_assertplus.equal(data[0].status, mod_protocol.FP_STATUS_DATA);
+	mod_assertplus.deepEqual(data[0].data, sample_object);
+    }
+}, {
+    'name': 'basic DATA message (old CRC calculation, dual CRC mode)',
+    'input': function () {
+	/*
+	 * The first few of these test cases hardcode protocol values to make
+	 * sure these constants don't break silently on us (e.g., checking null
+	 * against undefined because FP_OFF_TYPE has been deleted).  Later,
+	 * we'll just use the constants for clarity.
+	 */
+	var buf = new Buffer(mod_protocol.FP_HEADER_SZ + sample_data.length);
+	buf.writeUInt8(0x1, mod_protocol.FP_OFF_VERSION);
+	buf.writeUInt8(0x1, mod_protocol.FP_OFF_TYPE);
+	buf.writeUInt8(0x1, mod_protocol.FP_OFF_STATUS);
+	buf.writeUInt32BE(0xbadcafe, mod_protocol.FP_OFF_MSGID);
+	buf.writeUInt32BE(sample_old_crc, mod_protocol.FP_OFF_CRC);
+	buf.writeUInt32BE(sample_data.length, mod_protocol.FP_OFF_DATALEN);
+	buf.write(sample_data, mod_protocol.FP_OFF_DATA);
+	return (buf);
+    },
+    'crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2,
+    'check': function (error, data) {
+	mod_assertplus.ok(error === null);
+	mod_assertplus.equal(data.length, 1);
+	mod_assertplus.equal(data[0].msgid, 0xbadcafe);
+	mod_assertplus.equal(data[0].status, mod_protocol.FP_STATUS_DATA);
+	mod_assertplus.deepEqual(data[0].data, sample_object);
+    }
+}, {
+    'name': 'basic DATA message (decoder in dual CRC mode)',
+    'input': function () {
+	/*
+	 * The first few of these test cases hardcode protocol values to make
+	 * sure these constants don't break silently on us (e.g., checking null
+	 * against undefined because FP_OFF_TYPE has been deleted).  Later,
+	 * we'll just use the constants for clarity.
+	 */
+	var buf = new Buffer(mod_protocol.FP_HEADER_SZ + sample_data.length);
+	buf.writeUInt8(0x1, mod_protocol.FP_OFF_VERSION);
+	buf.writeUInt8(0x1, mod_protocol.FP_OFF_TYPE);
+	buf.writeUInt8(0x1, mod_protocol.FP_OFF_STATUS);
+	buf.writeUInt32BE(0xbadcafe, mod_protocol.FP_OFF_MSGID);
+	buf.writeUInt32BE(sample_crc, mod_protocol.FP_OFF_CRC);
+	buf.writeUInt32BE(sample_data.length, mod_protocol.FP_OFF_DATALEN);
+	buf.write(sample_data, mod_protocol.FP_OFF_DATA);
+	return (buf);
+    },
+    'crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2,
+    'check': function (error, data) {
+	mod_assertplus.ok(error === null);
+	mod_assertplus.equal(data.length, 1);
+	mod_assertplus.equal(data[0].msgid, 0xbadcafe);
+	mod_assertplus.equal(data[0].status, mod_protocol.FP_STATUS_DATA);
+	mod_assertplus.deepEqual(data[0].data, sample_object);
+    }
+}, {
     'name': 'basic DATA message',
     'input': function () {
 	/*
@@ -99,6 +183,7 @@ test_cases = [ {
 	buf.write(sample_data, mod_protocol.FP_OFF_DATA);
 	return (buf);
     },
+    'crc_mode': mod_protocol.FAST_CHECKSUM_V2,
     'check': function (error, data) {
 	mod_assertplus.ok(error === null);
 	mod_assertplus.equal(data.length, 1);
@@ -134,10 +219,11 @@ test_cases = [ {
 }, {
     'name': 'DATA message with maximum msgid',
     'input': function () {
-	var buf = makeSampleMessage();
+	var buf = makeSampleMessage(mod_protocol.FAST_CHECKSUM_V2);
 	buf.writeUInt32BE(mod_protocol.FP_MSGID_MAX, mod_protocol.FP_OFF_MSGID);
 	return (buf);
     },
+    'crc_mode': mod_protocol.FAST_CHECKSUM_V2,
     'check': function (error, data) {
 	mod_assertplus.ok(error === null);
 	mod_assertplus.equal(data.length, 1);
@@ -330,9 +416,9 @@ test_cases = [ {
 	mod_assertplus.equal(VError.info(error).foundMsgid, 2147483648);
     }
 }, {
-    'name': 'bad CRC',
+    'name': 'bad CRC 1',
     'input': function () {
-	var buf = makeSampleMessage();
+	var buf = makeSampleMessage(mod_protocol.FAST_CHECKSUM_V2);
 	mod_assertplus.ok(
 	    buf.readUInt32BE(mod_protocol.FP_OFF_CRC) != 0xdeadbeef);
 	buf.writeUInt32BE(0xdeadbeef, mod_protocol.FP_OFF_CRC);
@@ -345,6 +431,25 @@ test_cases = [ {
 	mod_assertplus.ok(/expected CRC 3735928559, found/.test(error.message));
 	mod_assertplus.equal(VError.info(error).fastReason, 'bad_crc');
 	mod_assertplus.equal(VError.info(error).crcCalculated, sample_crc);
+	mod_assertplus.equal(VError.info(error).crcExpected, 0xdeadbeef);
+    }
+}, {
+    'name': 'bad CRC 2',
+    'input': function () {
+	var buf = makeSampleMessage(mod_protocol.FAST_CHECKSUM_V1);
+	mod_assertplus.ok(
+	    buf.readUInt32BE(mod_protocol.FP_OFF_CRC) != 0xdeadbeef);
+	buf.writeUInt32BE(0xdeadbeef, mod_protocol.FP_OFF_CRC);
+	return (buf);
+    },
+    'crc_mode': mod_protocol.FAST_CHECKSUM_V1,
+    'check': function (error, data) {
+	mod_assertplus.equal(data.length, 0);
+	mod_assertplus.ok(error instanceof Error);
+	mod_assertplus.equal(error.name, 'FastProtocolError');
+	mod_assertplus.ok(/expected CRC 3735928559, found/.test(error.message));
+	mod_assertplus.equal(VError.info(error).fastReason, 'bad_crc');
+	mod_assertplus.equal(VError.info(error).crcCalculated, sample_old_crc);
 	mod_assertplus.equal(VError.info(error).crcExpected, 0xdeadbeef);
     }
 }, {
@@ -538,13 +643,13 @@ test_cases = [ {
     }
 } ];
 
-function makeSampleMessage()
+function makeSampleMessage(crc_mode)
 {
 	return (makeMessageForData(mod_protocol.FP_MSGID_MAX,
-	    mod_protocol.FP_STATUS_DATA, sample_object));
+	    mod_protocol.FP_STATUS_DATA, sample_object, crc_mode));
 }
 
-function makeMessageForData(msgid, status, data)
+function makeMessageForData(msgid, status, data, crc_mode)
 {
 	var datalen, dataenc, buf;
 
@@ -554,7 +659,7 @@ function makeMessageForData(msgid, status, data)
 	datalen = Buffer.byteLength(dataenc);
 	buf = new Buffer(mod_protocol.FP_HEADER_SZ + datalen);
 	mod_testcommon.writeMessageForEncodedData(
-	    buf, msgid, status, dataenc, 0);
+	    buf, msgid, status, dataenc, 0, crc_mode);
 	return (buf);
 }
 

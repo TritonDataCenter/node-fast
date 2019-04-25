@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2016, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -13,6 +13,7 @@
  */
 
 var mod_assertplus = require('assert-plus');
+var mod_old_crc = require('oldcrc');
 var mod_crc = require('crc');
 var mod_net = require('net');
 var mod_protocol = require('../lib/fast_protocol');
@@ -88,10 +89,15 @@ function makeBigObject(width, depth)
  * of invalid messages.  If you want to generate valid Fast messages, see the
  * MessageEncoder class.
  */
-function writeMessageForEncodedData(buf, msgid, status, dataenc, msgoffset)
+function writeMessageForEncodedData(buf, msgid, status, dataenc, msgoffset,
+    crc_mode)
 {
 	var crc, datalen;
-	crc = mod_crc.crc16(dataenc);
+	if (crc_mode && crc_mode === mod_protocol.FAST_CHECKSUM_V1) {
+		crc = mod_old_crc.crc16(dataenc);
+	} else {
+		crc = mod_crc.crc16(dataenc);
+	}
 	datalen = Buffer.byteLength(dataenc);
 
 	buf.writeUInt8(mod_protocol.FP_VERSION_1,

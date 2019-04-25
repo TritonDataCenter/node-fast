@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -80,17 +80,27 @@ function runTestCase(testcase, callback)
 		service: 'tst.client_request'
 	}});
 
+	var client_crc_mode = testcase.client_crc_mode;
+	var server_decoder_crc_mode = testcase.server_decoder_crc_mode;
+
 	console.log('test case: %s', testcase.name);
 	ctc = new mod_testclient.ClientTestContext({
 	    'collector': collector,
 	    'server': serverSocket,
-	    'log': testLog.child({ 'testcase': testcase['name'] })
+	    'log': testLog.child({ 'testcase': testcase['name'] }),
+	    'client_crc_mode': client_crc_mode,
+	    'server_decoder_crc_mode': server_decoder_crc_mode
 	});
 
 	ctc.establishConnection();
 	ctc.ctc_server_decoder.once('data', function (message) {
 		ctc.ctc_server_message = message;
 		testcase['serverReply'](ctc.ctc_server_sock, message,
+		    ctc.ctc_server_encoder, ctc.ctc_server_decoder);
+	});
+
+	ctc.ctc_server_decoder.on('error', function (err) {
+		testcase['serverReply'](ctc.ctc_server_sock, err,
 		    ctc.ctc_server_encoder, ctc.ctc_server_decoder);
 	});
 
@@ -178,9 +188,12 @@ var mockResponders = [ {
 	encoder.end({
 	    'msgid': message.msgid,
 	    'status': mod_protocol.FP_STATUS_END,
-	    'data': mod_testcommon.dummyResponseEndEmpty
+	    'data': mod_testcommon.dummyResponseEndEmpty,
+	    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
 	});
     },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
     'clientCheck': function (data, errors) {
 	mod_assertplus.ok(errors.socket === null);
 	mod_assertplus.ok(errors.client === null);
@@ -203,14 +216,17 @@ var mockResponders = [ {
 		encoder.write({
 		    'msgid': message.msgid,
 		    'status': i == nmessages - 1 ?
-		        mod_protocol.FP_STATUS_END :
+			mod_protocol.FP_STATUS_END :
 			mod_protocol.FP_STATUS_DATA,
-		    'data': { 'd': d }
+		    'data': { 'd': d },
+		    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
 		});
 	}
 
 	encoder.end();
     },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
     'clientCheck': function (data, errors) {
 	mod_assertplus.ok(errors.socket === null);
 	mod_assertplus.ok(errors.client === null);
@@ -229,9 +245,12 @@ var mockResponders = [ {
 	encoder.end({
 	    'msgid': message.msgid,
 	    'status': mod_protocol.FP_STATUS_ERROR,
-	    'data': mod_testcommon.dummyResponseError
+	    'data': mod_testcommon.dummyResponseError,
+	    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
 	});
     },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
     'clientCheck': function (data, errors) {
 	mod_assertplus.ok(errors.socket === null);
 	mod_assertplus.ok(errors.client === null);
@@ -251,16 +270,20 @@ var mockResponders = [ {
 		encoder.write({
 		    'msgid': message.msgid,
 		    'status': mod_protocol.FP_STATUS_DATA,
-		    'data': mod_testcommon.dummyResponseData
+		    'data': mod_testcommon.dummyResponseData,
+		    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
 		});
 	}
 
 	encoder.end({
 	    'msgid': message.msgid,
 	    'status': mod_protocol.FP_STATUS_ERROR,
-	    'data': mod_testcommon.dummyResponseError
+	    'data': mod_testcommon.dummyResponseError,
+	    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
 	});
     },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2,
     'clientCheck': function (data, errors) {
 	var i;
 	mod_assertplus.ok(errors.socket === null);
@@ -288,16 +311,19 @@ var mockResponders = [ {
 	    'msgid': message.msgid,
 	    'status': mod_protocol.FP_STATUS_ERROR,
 	    'data': {
-	        'd': {
+		'd': {
 		    'name': 'DummyError',
 		    'message': 'a dummy message',
 		    'someOtherProp': 'bogus',
 		    'context': 'abc123',
 		    'ase_errors': [ 'foobar' ]
 		}
-	    }
+	    },
+	    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
 	});
     },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2,
     'clientCheck': function (data, errors) {
 	var error;
 
@@ -322,6 +348,8 @@ var mockResponders = [ {
     'serverReply': function (socket, message, encoder) {
 	socket.end();
     },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2,
     'clientCheck': function (data, errors) {
 	mod_assertplus.ok(errors.socket === null);
 	mod_assertplus.ok(errors.client !== null);
@@ -341,6 +369,8 @@ var mockResponders = [ {
 	buf.writeUInt8(mod_protocol.FP_VERSION_1, mod_protocol.FP_OFF_VERSION);
 	socket.end(buf);
     },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2,
     'clientCheck': function (data, errors) {
 	mod_assertplus.ok(errors.socket === null);
 	mod_assertplus.ok(errors.client !== null);
@@ -359,9 +389,12 @@ var mockResponders = [ {
 	encoder.end({
 	    'msgid': message.msgid,
 	    'status': mod_protocol.FP_STATUS_DATA,
-	    'data': mod_testcommon.dummyResponseData
+	    'data': mod_testcommon.dummyResponseData,
+	    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
 	});
     },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2,
     'clientCheck': function (data, errors) {
 	mod_assertplus.ok(errors.socket === null);
 	mod_assertplus.ok(errors.client !== null);
@@ -382,9 +415,12 @@ var mockResponders = [ {
 	encoder.end({
 	    'msgid': 47,
 	    'status': mod_protocol.FP_STATUS_END,
-	    'data': mod_testcommon.dummyResponseData
+	    'data': mod_testcommon.dummyResponseData,
+	    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
 	});
     },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2,
     'clientCheck': function (data, errors) {
 	mod_assertplus.ok(errors.socket === null);
 	mod_assertplus.ok(errors.client !== null);
@@ -407,9 +443,12 @@ var mockResponders = [ {
 	 */
 	var buf = new Buffer(mod_protocol.FP_HEADER_SZ + 1);
 	mod_testcommon.writeMessageForEncodedData(
-	    buf, 3, mod_protocol.FP_STATUS_END, '{', 0);
+	    buf, 3, mod_protocol.FP_STATUS_END, '{', 0,
+	    mod_protocol.FAST_CHECKSUM_V2);
 	socket.end(buf);
     },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
     'clientCheck': function (data, errors) {
 	mod_assertplus.ok(errors.socket === null);
 	mod_assertplus.ok(errors.client !== null);
@@ -428,9 +467,12 @@ var mockResponders = [ {
 	encoder.end({
 	    'msgid': message.msgid,
 	    'status': mod_protocol.FP_STATUS_ERROR,
-	    'data': { 'd': {} }
+	    'data': { 'd': {} },
+	    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
 	});
     },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2,
     'clientCheck': function (data, errors) {
 	mod_assertplus.ok(errors.socket === null);
 	mod_assertplus.ok(errors.client !== null);
@@ -454,16 +496,20 @@ var mockResponders = [ {
 		encoder.write({
 		    'msgid': message.msgid,
 		    'status': mod_protocol.FP_STATUS_DATA,
-		    'data': { 'd': [ 'string_' + i ] }
+		    'data': { 'd': [ 'string_' + i ] },
+		    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
 		});
 	}
 
 	encoder.end({
 	    'msgid': message.msgid,
 	    'status': mod_protocol.FP_STATUS_END,
-	    'data': { 'd': [ 'lastmessage' ] }
+	    'data': { 'd': [ 'lastmessage' ] },
+	    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
 	});
     },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2,
     'clientCheck': function (data, errors) {
 	var i;
 	mod_assertplus.ok(errors.socket === null);
@@ -493,9 +539,12 @@ var mockResponders = [ {
 	encoder.end({
 	    'msgid': message.msgid,
 	    'status': mod_protocol.FP_STATUS_END,
-	    'data': { 'd': d }
+	    'data': { 'd': d },
+	    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
 	});
     },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2,
     'clientCheck': function (data, errors) {
 	var i;
 	mod_assertplus.ok(errors.socket === null);
@@ -517,7 +566,8 @@ var mockResponders = [ {
 	encoder.write({
 	    'msgid': message.msgid,
 	    'status': mod_protocol.FP_STATUS_END,
-	    'data': { 'd': d }
+	    'data': { 'd': d },
+	    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
 	});
 
 	encoder.end();
@@ -532,11 +582,135 @@ var mockResponders = [ {
 	    'fast_client_requests_completed{rpcMethod="testmethod",' +
 		'service="tst.client_request"} 1') !== -1);
     },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2,
     'clientCheck': function (data, errors) {
 	mod_assertplus.ok(errors.socket === null);
 	mod_assertplus.ok(errors.client === null);
 	mod_assertplus.ok(errors.request === null);
 	mod_assertplus.deepEqual(data, ['hello world']);
+    }
+
+}, {
+    'name': 'ok, client uses new crc encoding, server accepts old and new',
+    'serverReply': function (socket, message, encoder) {
+	var nmessages, i, j, d;
+
+	assertNormalRequest(message);
+	nmessages = 5;
+	for (i = 0; i < nmessages; i++) {
+		d = [];
+		for (j = 0; j < i; j++) {
+			d.push('string ' + i + '_' + j);
+		}
+		encoder.write({
+		    'msgid': message.msgid,
+		    'status': i == nmessages - 1 ?
+			mod_protocol.FP_STATUS_END :
+			mod_protocol.FP_STATUS_DATA,
+		    'data': { 'd': d },
+		    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
+		});
+	}
+
+	encoder.end();
+    },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2,
+    'clientCheck': function (data, errors) {
+	mod_assertplus.equal(errors.socket, null);
+	mod_assertplus.equal(errors.client, null);
+	mod_assertplus.equal(errors.request, null);
+	mod_assertplus.deepEqual(data, [
+	    'string 1_0', 'string 2_0', 'string 2_1', 'string 3_0',
+	    'string 3_1', 'string 3_2', 'string 4_0', 'string 4_1',
+	    'string 4_2', 'string 4_3'
+	]);
+    }
+
+}, {
+    'name': 'ok, client uses old crc encoding, server accepts old and new',
+    'serverReply': function (socket, message, encoder) {
+	var nmessages, i, j, d;
+
+	assertNormalRequest(message);
+	nmessages = 5;
+	for (i = 0; i < nmessages; i++) {
+		d = [];
+		for (j = 0; j < i; j++) {
+			d.push('string ' + i + '_' + j);
+		}
+		encoder.write({
+		    'msgid': message.msgid,
+		    'status': i == nmessages - 1 ?
+			mod_protocol.FP_STATUS_END :
+			mod_protocol.FP_STATUS_DATA,
+		    'data': { 'd': d },
+		    'crc_mode': mod_protocol.FAST_CHECKSUM_V1
+		});
+	}
+
+	encoder.end();
+    },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V1,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V1_V2,
+    'clientCheck': function (data, errors) {
+	mod_assertplus.equal(errors.socket, null);
+	mod_assertplus.equal(errors.client, null);
+	mod_assertplus.equal(errors.request, null);
+	mod_assertplus.deepEqual(data, [
+	    'string 1_0', 'string 2_0', 'string 2_1', 'string 3_0',
+	    'string 3_1', 'string 3_2', 'string 4_0', 'string 4_1',
+	    'string 4_2', 'string 4_3'
+	]);
+    }
+
+}, {
+    'name': 'error, client uses old crc encoding, server accepts only new',
+    'serverReply': function (socket, message, encoder) {
+	encoder.end({
+	    'msgid': 1,
+	    'status': mod_protocol.FP_STATUS_ERROR,
+	    'data': { 'd': message },
+	    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
+	});
+    },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V1,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
+    'clientCheck': function (data, errors) {
+	mod_assertplus.equal(errors.socket, null);
+	mod_assertplus.notEqual(errors.client, null);
+	mod_assertplus.notEqual(errors.request, null);
+	mod_assertplus.equal(data.length, 0);
+
+	mod_assertplus.equal(errors.client.name, 'FastProtocolError');
+	mod_assertplus.ok(/fast protocol: expected CRC/.test(
+	    errors.client.message));
+	mod_testcommon.assertRequestError(errors.request, errors.client);
+    }
+
+}, {
+    'name': 'error, client uses new crc encoding, server accepts only old',
+    'serverReply': function (socket, message, encoder) {
+	encoder.end({
+	    'msgid': 1,
+	    'status': mod_protocol.FP_STATUS_ERROR,
+	    'data': { 'd': message },
+	    'crc_mode': mod_protocol.FAST_CHECKSUM_V1
+	});
+    },
+    'client_crc_mode': mod_protocol.FAST_CHECKSUM_V2,
+    'server_decoder_crc_mode': mod_protocol.FAST_CHECKSUM_V1,
+    'clientCheck': function (data, errors) {
+	mod_assertplus.equal(errors.socket, null);
+	mod_assertplus.notEqual(errors.client, null);
+	mod_assertplus.notEqual(errors.request, null);
+	mod_assertplus.equal(data.length, 0);
+
+	mod_assertplus.equal(errors.client.name, 'FastProtocolError');
+	mod_assertplus.ok(/fast protocol: expected CRC/.test(
+	    errors.client.message));
+	mod_testcommon.assertRequestError(errors.request, errors.client);
     }
 
 } ];

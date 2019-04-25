@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2016, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -35,8 +35,19 @@ function main()
 	bigdataval = JSON.stringify(bigdata);
 	printf('%d bytes (stringified)\n', bigdataval.length);
 
-	test_cases.forEach(runTestCase);
+	test_cases.map(useOldCrc).forEach(runTestCase);
+	test_cases.map(useNewCrc).forEach(runTestCase);
 	printf('%s tests passed\n', mod_path.basename(__filename));
+}
+
+function useOldCrc(testCase) {
+	testCase.input.crc_mode = mod_protocol.FAST_CHECKSUM_V1;
+	return (testCase);
+}
+
+function useNewCrc(testCase) {
+	testCase.input.crc_mode = mod_protocol.FAST_CHECKSUM_V2;
+	return (testCase);
 }
 
 test_cases = [ {
@@ -53,7 +64,11 @@ test_cases = [ {
 	mod_assertplus.equal(parsed.pm_data.toString('utf8'), expected);
 	mod_assertplus.equal(parsed.pm_msgid, 1);
 	mod_assertplus.equal(parsed.pm_status, mod_protocol.FP_STATUS_DATA);
-	mod_assertplus.equal(parsed.pm_crc, 10980);
+	if (parsed.pm_crc_mode === mod_protocol.FAST_CHECKSUM_V1) {
+		mod_assertplus.equal(parsed.pm_crc, 10980);
+	} else {
+		mod_assertplus.equal(parsed.pm_crc, 7500);
+	}
     }
 }, {
     'name': 'large data message',
@@ -253,6 +268,7 @@ function runTestCase(testcase)
 		parsed.pm_msgid =
 		    outbuf.readUInt32BE(mod_protocol.FP_OFF_MSGID);
 		parsed.pm_crc = outbuf.readUInt32BE(mod_protocol.FP_OFF_CRC);
+		parsed.pm_crc_mode = testcase.input.crc_mode;
 
 		mod_assertplus.ok(parsed.pm_status > 0 &&
 		    parsed.pm_status <= 0x3);
