@@ -4,6 +4,10 @@
 
 None yet.
 
+## v2.7.0
+
+* #23 Add support for updated crc package to improve interoperability
+
 ## v2.6.1
 
 * #22 Fix copy-paste bug in fast_server module
