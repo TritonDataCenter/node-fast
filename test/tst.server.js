@@ -45,38 +45,35 @@ function main()
 	mod_vasync.forEachPipeline({
 	    'inputs': serverTestCases,
 	    'func': runTestCase
-	}, function (err) {
-		if (err) {
-			throw (err);
+	}, function (err1) {
+		if (err1) {
+			throw (err1);
 		}
 
-		mod_testcommon.unregisterExitBlocker('test run');
-	});
+		SERVER_CRC_MODE = mod_fast.FAST_CHECKSUM_V1_V2;
 
-	SERVER_CRC_MODE = mod_fast.FAST_CHECKSUM_V1_V2;
+		mod_vasync.forEachPipeline({
+		    'inputs': serverTestCases,
+		    'func': runTestCase
+		}, function (err2) {
+			if (err2) {
+				throw (err2);
+			}
 
-	mod_vasync.forEachPipeline({
-	    'inputs': serverTestCases,
-	    'func': runTestCase
-	}, function (err) {
-		if (err) {
-			throw (err);
-		}
+			CLIENT_CRC_MODE = mod_fast.FAST_CHECKSUM_V2;
 
-		mod_testcommon.unregisterExitBlocker('test run');
-	});
+			mod_vasync.forEachPipeline({
+			    'inputs': serverTestCases,
+			    'func': runTestCase
+			}, function (err3) {
+				if (err3) {
+					throw (err3);
+				}
 
-	CLIENT_CRC_MODE = mod_fast.FAST_CHECKSUM_V2;
-
-	mod_vasync.forEachPipeline({
-	    'inputs': serverTestCases,
-	    'func': runTestCase
-	}, function (err) {
-		if (err) {
-			throw (err);
-		}
-
-		mod_testcommon.unregisterExitBlocker('test run');
+				var tr = 'test run';
+				mod_testcommon.unregisterExitBlocker(tr);
+			});
+		});
 	});
 }
 
