@@ -4,9 +4,14 @@
 
 None yet.
 
-## v2.7.1
+## v2.8.1
 
-* node-fast use wrong CRC library version when encoding errors to clients using updated CRC library version
+* node-fast use wrong CRC library version when encoding errors to clients using
+  updated CRC library version
+
+## v2.8.0
+
+ * node-fast provider transitive dependencies too old to build on x86_64
 
 ## v2.7.0
 
