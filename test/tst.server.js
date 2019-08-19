@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -30,6 +30,9 @@ var VError = require('verror');
 var testLog;
 var serverTestCases;
 
+var SERVER_CRC_MODE = mod_fast.FAST_CHECKSUM_V1;
+var CLIENT_CRC_MODE = mod_fast.FAST_CHECKSUM_V1;
+
 function main()
 {
 	testLog = new mod_bunyan({
@@ -37,17 +40,40 @@ function main()
 	    'level': process.env['LOG_LEVEL'] || 'fatal'
 	});
 
-	mod_testcommon.registerExitBlocker('test run');
+	var tr = 'test run';
+	mod_testcommon.registerExitBlocker(tr);
 
 	mod_vasync.forEachPipeline({
 	    'inputs': serverTestCases,
 	    'func': runTestCase
-	}, function (err) {
-		if (err) {
-			throw (err);
+	}, function (err1) {
+		if (err1) {
+			throw (err1);
 		}
 
-		mod_testcommon.unregisterExitBlocker('test run');
+		SERVER_CRC_MODE = mod_fast.FAST_CHECKSUM_V1_V2;
+
+		mod_vasync.forEachPipeline({
+		    'inputs': serverTestCases,
+		    'func': runTestCase
+		}, function (err2) {
+			if (err2) {
+				throw (err2);
+			}
+
+			CLIENT_CRC_MODE = mod_fast.FAST_CHECKSUM_V2;
+
+			mod_vasync.forEachPipeline({
+			    'inputs': serverTestCases,
+			    'func': runTestCase
+			}, function (err3) {
+				if (err3) {
+					throw (err3);
+				}
+
+				mod_testcommon.unregisterExitBlocker(tr);
+			});
+		});
 	});
 }
 
@@ -74,7 +100,8 @@ ServerTestContext.prototype.connectClient = function (callback)
 	cclient = new mod_fast.FastClient({
 	    'log': this.ts_log.child({ 'component': 'FastClient' }),
 	    'transport': csock,
-	    'nRecentRequests': 100
+	    'nRecentRequests': 100,
+	    'crc_mode': CLIENT_CRC_MODE
 	});
 
 	csock.on('connect', function () {
@@ -170,7 +197,8 @@ function runTestCase(testcase, callback)
 	tctx.ts_server = new mod_fast.FastServer({
 	    'collector': tctx.ts_collector,
 	    'log': tctx.ts_log.child({ 'component': 'FastServer' }),
-	    'server': tctx.ts_socket
+	    'server': tctx.ts_socket,
+	    'crc_mode': SERVER_CRC_MODE
 	});
 
 	mod_fastdemo.demoRpcs().forEach(function (rpc) {

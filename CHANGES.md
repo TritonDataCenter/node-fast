@@ -4,6 +4,10 @@
 
 None yet.
 
+## v2.7.1
+
+* node-fast use wrong CRC library version when encoding errors to clients using updated CRC library version
+
 ## v2.7.0
 
 * #23 Add support for updated crc package to improve interoperability
