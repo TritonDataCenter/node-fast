@@ -1,7 +1,7 @@
 {
 	"name": "fast",
 	"description": "streaming JSON RPC over TCP",
-	"version": "2.7.0",
+	"version": "2.8.0",
 	"main": "./lib/fast.js",
 	"repository": {
 		"type": "git",
@@ -15,7 +15,7 @@
 		"oldcrc": "git://github.com/joyent/node-crc.git#0.3.0-oldcrc",
 		"extsprintf": "^1.3.0",
 		"jsprim": "^1.2.2",
-		"kang": "^1.1.0",
+		"kang": "^1.3.0",
 		"lstream": "0.0.4",
 		"microtime": "2.1.6",
 		"posix-getopt": "1.2.0",
@@ -29,7 +29,7 @@
 		"restify": "5.2.0"
 	},
 	"optionalDependencies": {
-	    "dtrace-provider": "^0.8.5"
+	    "dtrace-provider": "^0.8.7"
 	},
 	"license": "MIT"
 }
