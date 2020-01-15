@@ -7,7 +7,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -27,8 +27,7 @@ var OPTS = {
 	'a': 'abandon the RPC request after issuing it ' +
 	    'via FastClientRequest#abandon',
 	'c': 'do not close the socket used to talk ' +
-	    'to the FastServer until SIGINT',
-	'm': 'optional CRC compatibility mode. One of: v1 or v2. Default: v2.'
+	    'to the FastServer until SIGINT'
 };
 
 function main()
@@ -44,7 +43,6 @@ function main()
 		'    OPTIONS',
 		'        -a,--abandon-immediately   ' + OPTS['a'],
 		'        -c,--leave-conn-open       ' + OPTS['c'],
-		'        -m,--crc-mode              ' + OPTS['m'],
 		'    HOST     DNS name or IP address for remote server',
 		'    PORT     TCP port for remote server',
 		'    METHOD   Name of remote RPC method call',
@@ -54,11 +52,9 @@ function main()
 	});
 	mod_cmdutil.exitOnEpipe();
 
-	var crcMode = mod_fast.FAST_CHECKSUM_V2;
-
 	var option;
 	var parser = new mod_getopt.BasicParser('a(abandon-immediately)' +
-	    'c(leave-conn-open)m:(crc-mode)', process.argv);
+	    'c(leave-conn-open)', process.argv);
 	while ((option = parser.getopt()) !== undefined) {
 		switch (option.option) {
 			case 'c':
@@ -66,9 +62,6 @@ function main()
 				break;
 			case 'a':
 				doabandon = true;
-				break;
-			case 'm':
-				crcMode = parseOptCrcMode(option);
 				break;
 			default:
 				mod_assertplus.equal('?', option.option);
@@ -106,8 +99,7 @@ function main()
 	    'rpcargs': rpcargs,
 	    'timeout': timeout,
 	    'abandonImmediately': doabandon,
-	    'leaveConnOpen': leaveconnopen,
-	    'crc_mode': crcMode
+	    'leaveConnOpen': leaveconnopen
 	}, function (err, result) {
 		if (err) {
 			mod_cmdutil.warn(err);
@@ -115,23 +107,10 @@ function main()
 	});
 }
 
-function parseOptCrcMode(option)
-{
-	switch (option.optarg) {
-	case 'v1':
-		return (mod_fast.FAST_CHECKSUM_V1);
-	case 'v2':
-		return (mod_fast.FAST_CHECKSUM_V2);
-	default:
-		mod_cmdutil.usage('invalid CRC mode: %s', option.optarg);
-		return (-1);
-	}
-}
-
 function fastcall(args, callback)
 {
 	var log, conn;
-	var rpcmethod, rpcargs, timeout, doabandon, leaveconnopen, crc_mode;
+	var rpcmethod, rpcargs, timeout, doabandon, leaveconnopen;
 
 	mod_assertplus.object(args, 'args');
 	mod_assertplus.string(args.host, 'args.host');
@@ -141,14 +120,12 @@ function fastcall(args, callback)
 	mod_assertplus.array(args.rpcargs, 'args.rpcargs');
 	mod_assertplus.bool(args.abandonImmediately, 'args.abandonImmediately');
 	mod_assertplus.bool(args.leaveConnOpen, 'args.leaveConnOpen');
-	mod_assertplus.number(args.crc_mode, 'args.crc_mode');
 
 	rpcmethod = args.rpcmethod;
 	rpcargs = args.rpcargs;
 	timeout = args.timeout;
 	doabandon = args.abandonImmediately;
 	leaveconnopen = args.leaveConnOpen;
-	crc_mode = args.crc_mode;
 
 	log = new mod_bunyan({
 	    'name': 'fastcall',
@@ -177,8 +154,7 @@ function fastcall(args, callback)
 		fastconn = new mod_fast.FastClient({
 		    'log': log,
 		    'transport': conn,
-		    'nRecentRequests': 10,
-		    'crc_mode': crc_mode
+		    'nRecentRequests': 10
 		});
 
 		fastconn.on('error', function (err) {

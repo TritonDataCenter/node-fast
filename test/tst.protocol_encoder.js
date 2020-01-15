@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -35,19 +35,8 @@ function main()
 	bigdataval = JSON.stringify(bigdata);
 	printf('%d bytes (stringified)\n', bigdataval.length);
 
-	test_cases.map(useOldCrc).forEach(runTestCase);
-	test_cases.map(useNewCrc).forEach(runTestCase);
+	test_cases.forEach(runTestCase);
 	printf('%s tests passed\n', mod_path.basename(__filename));
-}
-
-function useOldCrc(testCase) {
-	testCase.input.crc_mode = mod_protocol.FAST_CHECKSUM_V1;
-	return (testCase);
-}
-
-function useNewCrc(testCase) {
-	testCase.input.crc_mode = mod_protocol.FAST_CHECKSUM_V2;
-	return (testCase);
 }
 
 test_cases = [ {
@@ -55,7 +44,8 @@ test_cases = [ {
     'input': {
 	'msgid': 1,
 	'status': mod_protocol.FP_STATUS_DATA,
-	'data': [ 'hello', 'world' ]
+	'data': [ 'hello', 'world' ],
+	'version': mod_protocol.FP_VERSION_CURRENT
     },
     'check': function (output, parsed) {
 	var expected = '["hello","world"]';
@@ -63,19 +53,35 @@ test_cases = [ {
 	mod_assertplus.equal(parsed.pm_datalen, expectedlen);
 	mod_assertplus.equal(parsed.pm_data.toString('utf8'), expected);
 	mod_assertplus.equal(parsed.pm_msgid, 1);
-	mod_assertplus.equal(parsed.pm_status, mod_protocol.FP_STATUS_DATA);
-	if (parsed.pm_crc_mode === mod_protocol.FAST_CHECKSUM_V1) {
-		mod_assertplus.equal(parsed.pm_crc, 10980);
-	} else {
-		mod_assertplus.equal(parsed.pm_crc, 7500);
-	}
+	mod_assertplus.equal(parsed.pm_crc, 7500);
+	mod_assertplus.equal(parsed.pm_version,
+	    mod_protocol.FP_VERSION_CURRENT);
+    }
+}, {
+    'name': 'basic data message, protocol version 1',
+    'input': {
+	'msgid': 1,
+	'status': mod_protocol.FP_STATUS_DATA,
+	'data': [ 'hello', 'world' ],
+	'version': mod_protocol.FP_VERSION_1
+    },
+    'check': function (output, parsed) {
+	var expected = '["hello","world"]';
+	var expectedlen = Buffer.byteLength(expected);
+	mod_assertplus.equal(parsed.pm_datalen, expectedlen);
+	mod_assertplus.equal(parsed.pm_data.toString('utf8'), expected);
+	mod_assertplus.equal(parsed.pm_msgid, 1);
+	mod_assertplus.equal(parsed.pm_crc, 10980);
+	mod_assertplus.equal(parsed.pm_version,
+	    mod_protocol.FP_VERSION_1);
     }
 }, {
     'name': 'large data message',
     'input': {
 	'msgid': 7,
 	'status': mod_protocol.FP_STATUS_DATA,
-	'data': function () { return (bigdata); }
+	'data': function () { return (bigdata); },
+	'version': mod_protocol.FP_VERSION_CURRENT
     },
     'check': function (output, parsed) {
 	var expected = bigdataval;
@@ -84,13 +90,34 @@ test_cases = [ {
 	mod_assertplus.equal(parsed.pm_data.toString('utf8'), expected);
 	mod_assertplus.equal(parsed.pm_msgid, 7);
 	mod_assertplus.equal(parsed.pm_status, mod_protocol.FP_STATUS_DATA);
+	mod_assertplus.equal(parsed.pm_version,
+	    mod_protocol.FP_VERSION_CURRENT);
+    }
+}, {
+    'name': 'large data message, protocol version 1',
+    'input': {
+	'msgid': 7,
+	'status': mod_protocol.FP_STATUS_DATA,
+	'data': function () { return (bigdata); },
+	'version': mod_protocol.FP_VERSION_1
+    },
+    'check': function (output, parsed) {
+	var expected = bigdataval;
+	var expectedlen = Buffer.byteLength(expected);
+	mod_assertplus.equal(parsed.pm_datalen, expectedlen);
+	mod_assertplus.equal(parsed.pm_data.toString('utf8'), expected);
+	mod_assertplus.equal(parsed.pm_msgid, 7);
+	mod_assertplus.equal(parsed.pm_status, mod_protocol.FP_STATUS_DATA);
+	mod_assertplus.equal(parsed.pm_version,
+	    mod_protocol.FP_VERSION_1);
     }
 }, {
     'name': 'minimum msgid',
     'input': {
 	'msgid': 0,
 	'status': mod_protocol.FP_STATUS_ERROR,
-	'data': []
+	'data': [],
+	'version': mod_protocol.FP_VERSION_CURRENT
     },
     'check': function (output, parsed) {
 	mod_assertplus.equal(parsed.pm_msgid, 0);
@@ -101,18 +128,22 @@ test_cases = [ {
     'input': {
 	'msgid': 2147483647,
 	'status': mod_protocol.FP_STATUS_END,
-	'data': [ 'hello' ]
+	'data': [ 'hello' ],
+	'version': mod_protocol.FP_VERSION_CURRENT
     },
     'check': function (output, parsed) {
 	mod_assertplus.equal(parsed.pm_msgid, 2147483647);
 	mod_assertplus.equal(parsed.pm_status, mod_protocol.FP_STATUS_END);
+	mod_assertplus.equal(parsed.pm_version,
+	    mod_protocol.FP_VERSION_CURRENT);
     }
 }, {
     'name': 'bad msgid: missing',
     'error': /msg.msgid is not an integer between 0 and FP_MSGID_MAX/,
     'input': {
 	'status': mod_protocol.FP_STATUS_DATA,
-	'data': []
+	'data': [],
+	'version': mod_protocol.FP_VERSION_CURRENT
     }
 }, {
     'name': 'bad msgid: negative',
@@ -120,7 +151,8 @@ test_cases = [ {
     'input': {
 	'msgid': -3,
 	'status': mod_protocol.FP_STATUS_DATA,
-	'data': []
+	'data': [],
+	'version': mod_protocol.FP_VERSION_CURRENT
     }
 }, {
     'name': 'bad msgid: too large',
@@ -128,7 +160,8 @@ test_cases = [ {
     'input': {
 	'msgid': 2147483648,
 	'status': mod_protocol.FP_STATUS_DATA,
-	'data': []
+	'data': [],
+	'version': mod_protocol.FP_VERSION_CURRENT
     }
 }, {
     'name': 'bad msgid: non-integer',
@@ -136,7 +169,8 @@ test_cases = [ {
     'input': {
 	'msgid': 3.7,
 	'status': mod_protocol.FP_STATUS_DATA,
-	'data': []
+	'data': [],
+	'version': mod_protocol.FP_VERSION_CURRENT
     }
 }, {
     'name': 'bad msgid: non-numeric',
@@ -144,14 +178,16 @@ test_cases = [ {
     'input': {
 	'msgid': {},
 	'status': mod_protocol.FP_STATUS_DATA,
-	'data': []
+	'data': [],
+	'version': mod_protocol.FP_VERSION_CURRENT
     }
 }, {
     'name': 'bad status: missing',
     'error': /msg.status \(number\) is required/,
     'input': {
 	'msgid': 17,
-	'data': []
+	'data': [],
+	'version': mod_protocol.FP_VERSION_CURRENT
     }
 }, {
     'name': 'bad status: non-numeric',
@@ -159,7 +195,8 @@ test_cases = [ {
     'input': {
 	'msgid': 17,
 	'status': {},
-	'data': []
+	'data': [],
+	'version': mod_protocol.FP_VERSION_CURRENT
     }
 }, {
     'name': 'bad status: unsupported value (4)',
@@ -167,7 +204,8 @@ test_cases = [ {
     'input': {
 	'msgid': 17,
 	'status': 4,
-	'data': []
+	'data': [],
+	'version': mod_protocol.FP_VERSION_CURRENT
     }
 }, {
     'name': 'bad status: unsupported value (0)',
@@ -175,14 +213,16 @@ test_cases = [ {
     'input': {
 	'msgid': 17,
 	'status': 0,
-	'data': []
+	'data': [],
+	'version': mod_protocol.FP_VERSION_CURRENT
     }
 }, {
     'name': 'bad data: missing',
     'error': /msg.data \(object\) is required/,
     'input': {
 	'msgid': 17,
-	'status': mod_protocol.FP_STATUS_ERROR
+	'status': mod_protocol.FP_STATUS_ERROR,
+	'version': mod_protocol.FP_VERSION_CURRENT
     }
 }, {
     'name': 'bad data: null',
@@ -190,7 +230,8 @@ test_cases = [ {
     'input': {
 	'msgid': 17,
 	'status': mod_protocol.FP_STATUS_ERROR,
-	'data': null
+	'data': null,
+	'version': mod_protocol.FP_VERSION_CURRENT
     }
 }, {
     'name': 'bad data: numeric',
@@ -198,7 +239,8 @@ test_cases = [ {
     'input': {
 	'msgid': 17,
 	'status': mod_protocol.FP_STATUS_ERROR,
-	'data': 47
+	'data': 47,
+	'version': mod_protocol.FP_VERSION_CURRENT
     }
 }, {
     'name': 'bad data: not stringifiable',
@@ -206,7 +248,8 @@ test_cases = [ {
     'input': {
 	'msgid': 17,
 	'status': mod_protocol.FP_STATUS_ERROR,
-	'data': [ circular ]
+	'data': [ circular ],
+	'version': mod_protocol.FP_VERSION_CURRENT
     }
 } ];
 
@@ -255,8 +298,8 @@ function runTestCase(testcase)
 		 */
 		mod_assertplus.ok(Buffer.isBuffer(outbuf));
 		mod_assertplus.ok(outbuf.length > mod_protocol.FP_HEADER_SZ);
-		mod_assertplus.equal(1,
-		    outbuf.readUInt8(mod_protocol.FP_OFF_VERSION));
+//		mod_assertplus.equal(mod_protocol.FP_VERSION_CURRENT,
+//		    outbuf.readUInt8(mod_protocol.FP_OFF_VERSION));
 		mod_assertplus.equal(0x1,
 		    outbuf.readUInt8(mod_protocol.FP_OFF_TYPE));
 
@@ -268,7 +311,8 @@ function runTestCase(testcase)
 		parsed.pm_msgid =
 		    outbuf.readUInt32BE(mod_protocol.FP_OFF_MSGID);
 		parsed.pm_crc = outbuf.readUInt32BE(mod_protocol.FP_OFF_CRC);
-		parsed.pm_crc_mode = testcase.input.crc_mode;
+		parsed.pm_version =
+		    outbuf.readUInt8(mod_protocol.FP_OFF_VERSION);
 
 		mod_assertplus.ok(parsed.pm_status > 0 &&
 		    parsed.pm_status <= 0x3);

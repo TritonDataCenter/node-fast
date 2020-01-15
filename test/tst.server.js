@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -30,9 +30,6 @@ var VError = require('verror');
 var testLog;
 var serverTestCases;
 
-var SERVER_CRC_MODE = mod_fast.FAST_CHECKSUM_V1;
-var CLIENT_CRC_MODE = mod_fast.FAST_CHECKSUM_V1;
-
 function main()
 {
 	testLog = new mod_bunyan({
@@ -51,8 +48,6 @@ function main()
 			throw (err1);
 		}
 
-		SERVER_CRC_MODE = mod_fast.FAST_CHECKSUM_V1_V2;
-
 		mod_vasync.forEachPipeline({
 		    'inputs': serverTestCases,
 		    'func': runTestCase
@@ -60,8 +55,6 @@ function main()
 			if (err2) {
 				throw (err2);
 			}
-
-			CLIENT_CRC_MODE = mod_fast.FAST_CHECKSUM_V2;
 
 			mod_vasync.forEachPipeline({
 			    'inputs': serverTestCases,
@@ -100,8 +93,7 @@ ServerTestContext.prototype.connectClient = function (callback)
 	cclient = new mod_fast.FastClient({
 	    'log': this.ts_log.child({ 'component': 'FastClient' }),
 	    'transport': csock,
-	    'nRecentRequests': 100,
-	    'crc_mode': CLIENT_CRC_MODE
+	    'nRecentRequests': 100
 	});
 
 	csock.on('connect', function () {
@@ -197,8 +189,7 @@ function runTestCase(testcase, callback)
 	tctx.ts_server = new mod_fast.FastServer({
 	    'collector': tctx.ts_collector,
 	    'log': tctx.ts_log.child({ 'component': 'FastServer' }),
-	    'server': tctx.ts_socket,
-	    'crc_mode': SERVER_CRC_MODE
+	    'server': tctx.ts_socket
 	});
 
 	mod_fastdemo.demoRpcs().forEach(function (rpc) {
@@ -731,7 +722,8 @@ serverTestCases = [ {
 		client1.fc_msgencoder.write({
 		    'msgid': 7,
 		    'status': mod_protocol.FP_STATUS_END,
-		    'data': { 'd': [] }
+		    'data': { 'd': [] },
+		    'version': mod_protocol.FP_VERSION_CURRENT
 		});
 		return (true);
 	}, function (err) {

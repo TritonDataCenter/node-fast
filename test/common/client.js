@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -35,23 +35,14 @@ function ClientTestContext(args)
 	mod_assertplus.object(args.server);
 	mod_assertplus.object(args.log);
 	mod_assertplus.optionalObject(args.collector);
-	mod_assertplus.optionalNumber(args.client_crc_mode);
-	mod_assertplus.optionalNumber(args.server_decoder_crc_mode);
+	mod_assertplus.optionalNumber(args.client_version);
 
 	this.ctc_collector = args.collector; /* artedi collector */
 	this.ctc_log = args.log;		/* bunyan logger */
 	this.ctc_closed = false;		/* already cleaned up */
 
-	/*
-	 * Settings to test the CRC modes added to support transitioning off the
-	 * buggy node-crc@0.3.0 dependency.
-	 */
-	this.client_crc_mode = args.client_crc_mode ||
-	    mod_protocol.FAST_CHECKSUM_V2;
-	this.server_decoder_crc_mode = args.server_decoder_crc_mode ||
-	    mod_protocol.FAST_CHECKSUM_V2;
-	this.server_encoder_crc_mode = args.server_encoder_crc_mode ||
-	    mod_protocol.FAST_CHECKSUM_V2;
+	this.client_version = args.client_version ||
+	    mod_protocol.FP_VERSION_CURRENT;
 
 	/* server handles */
 	this.ctc_server = args.server;	/* server listening socket */
@@ -84,7 +75,7 @@ ClientTestContext.prototype.establishConnection = function ()
 	    'log': this.ctc_log.child({ 'component': 'FastClient' }),
 	    'nRecentRequests': 100,
 	    'transport': this.ctc_client_sock,
-	    'crc_mode': this.client_crc_mode
+	    'version': this.client_version
 	});
 
 	this.ctc_fastclient.on('error', function (err) {
@@ -103,9 +94,9 @@ ClientTestContext.prototype.establishConnection = function ()
 	});
 
 	this.ctc_server_encoder =
-	    new mod_protocol.FastMessageEncoder(this.server_encoder_crc_mode);
+	    new mod_protocol.FastMessageEncoder();
 	this.ctc_server_decoder =
-	    new mod_protocol.FastMessageDecoder(this.server_decoder_crc_mode);
+	    new mod_protocol.FastMessageDecoder();
 };
 
 /*
@@ -141,7 +132,8 @@ ClientTestContext.prototype.serverReply = function (message, options)
 		this.ctc_server_encoder.write({
 		    'msgid': message.msgid,
 		    'status': mod_protocol.FP_STATUS_DATA,
-		    'data': mod_testcommon.dummyResponseData
+		    'data': mod_testcommon.dummyResponseData,
+		    'version': this.client_version
 		});
 	}
 
@@ -149,13 +141,15 @@ ClientTestContext.prototype.serverReply = function (message, options)
 		this.ctc_server_encoder.write({
 		    'msgid': message.msgid,
 		    'status': mod_protocol.FP_STATUS_ERROR,
-		    'data': mod_testcommon.dummyResponseError
+		    'data': mod_testcommon.dummyResponseError,
+		    'version': this.client_version
 		});
 	} else {
 		this.ctc_server_encoder.write({
 		    'msgid': message.msgid,
 		    'status': mod_protocol.FP_STATUS_END,
-		    'data': mod_testcommon.dummyResponseData
+		    'data': mod_testcommon.dummyResponseData,
+		    'version': this.client_version
 		});
 	}
 };
