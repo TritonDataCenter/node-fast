@@ -89,7 +89,8 @@ function makeBigObject(width, depth)
  * of invalid messages.  If you want to generate valid Fast messages, see the
  * MessageEncoder class.
  */
-function writeMessageForEncodedData(buf, msgid, status, dataenc, msgoffset, version)
+function writeMessageForEncodedData(buf, msgid, status, dataenc, msgoffset,
+    version)
 {
 	var crc;
 	if (version === mod_protocol.FP_VERSION_1) {

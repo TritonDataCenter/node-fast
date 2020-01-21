@@ -510,7 +510,8 @@ var test_cases = [ {
 			 * top-level error.  We need to check its cause.
 			 */
 			var name = rq.ctr_error.cause().name;
-			mod_assertplus.ok(name === 'FastTransportError' || name === 'FastProtocolError');
+			mod_assertplus.ok(name === 'FastTransportError' ||
+			    name === 'FastProtocolError');
 		});
 
 		mod_assertplus.equal(requests.length, 100);

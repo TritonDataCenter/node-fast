@@ -223,7 +223,8 @@ test_cases = [ {
 	for (i = 0; i < nmessages; i++) {
 		msgoffset = i * msgsize;
 		mod_testcommon.writeMessageForEncodedData(buf, i + 1,
-		    mod_protocol.FP_STATUS_DATA, sample_data, msgoffset, mod_protocol.FP_VERSION_1);
+		    mod_protocol.FP_STATUS_DATA, sample_data, msgoffset,
+		    mod_protocol.FP_VERSION_1);
 	}
 
 	return (buf);
