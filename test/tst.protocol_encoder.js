@@ -298,8 +298,6 @@ function runTestCase(testcase)
 		 */
 		mod_assertplus.ok(Buffer.isBuffer(outbuf));
 		mod_assertplus.ok(outbuf.length > mod_protocol.FP_HEADER_SZ);
-//		mod_assertplus.equal(mod_protocol.FP_VERSION_CURRENT,
-//		    outbuf.readUInt8(mod_protocol.FP_OFF_VERSION));
 		mod_assertplus.equal(0x1,
 		    outbuf.readUInt8(mod_protocol.FP_OFF_TYPE));
 

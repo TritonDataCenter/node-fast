@@ -31,7 +31,7 @@ var mod_util = require('util');
 var OPTS = {
     '-p,--port': 'fast RPC listening port(default: 2030)',
     '-m,--mon-port': 'monitoring server listening port (default: port+800)',
-    '-q,--quiesce': 'enable quiesce (default: false)',
+    '-q,--quiesce': 'enable quiesce (default: false)'
 };
 
 /* construct the usage message */
