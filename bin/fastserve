@@ -7,7 +7,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -31,9 +31,7 @@ var mod_util = require('util');
 var OPTS = {
     '-p,--port': 'fast RPC listening port(default: 2030)',
     '-m,--mon-port': 'monitoring server listening port (default: port+800)',
-    '-q,--quiesce': 'enable quiesce (default: false)',
-    '-c,--crc-mode': 'CRC compatibility mode. One of: v1, v2, or v1_v2 ' +
-	'(default: v1_v2).'
+    '-q,--quiesce': 'enable quiesce (default: false)'
 };
 
 /* construct the usage message */
@@ -49,8 +47,7 @@ function main()
 	/* default configuration values - monitorPort is set later */
 	var config = {
 	    'quiesce': false,
-	    'fastPort': 2030,
-	    'crcMode': mod_fast.FAST_CHECKSUM_V1_V2
+	    'fastPort': 2030
 	};
 
 	mod_cmdutil.configure({
@@ -60,7 +57,7 @@ function main()
 	mod_cmdutil.exitOnEpipe();
 
 	var parser = new mod_getopt.BasicParser('p:(port)m:(mon-port)' +
-	    'q(quiesce)c:(crc-mode)', process.argv);
+	    'q(quiesce)', process.argv);
 	while ((option = parser.getopt()) !== undefined) {
 		switch (option.option) {
 			case 'q':
@@ -73,9 +70,6 @@ function main()
 			case 'm':
 				config.monitorPort =
 				    mod_jsprim.parseInteger(option.optarg);
-				break;
-			case 'c':
-				config.crcMode = parseOptCrcMode(option);
 				break;
 			default:
 				mod_assertplus.equal('?', option.option);
@@ -116,21 +110,6 @@ function main()
 	fastDemoServer(config);
 }
 
-function parseOptCrcMode(option)
-{
-	switch (option.optarg) {
-	case 'v1':
-		return (mod_fast.FAST_CHECKSUM_V1);
-	case 'v2':
-		return (mod_fast.FAST_CHECKSUM_V2);
-	case 'v1_v2':
-		return (mod_fast.FAST_CHECKSUM_V1_V2);
-	default:
-		mod_cmdutil.usage('invalid CRC mode: %s', option.optarg);
-		return (-1);
-	}
-}
-
 function fastDemoServer(args)
 {
 	var fastPort, log, sock, collector, fastserver;
@@ -140,7 +119,6 @@ function fastDemoServer(args)
 	mod_assertplus.number(args.fastPort, 'args.fastPort');
 	mod_assertplus.number(args.monitorPort, 'args.monitorPort');
 	mod_assertplus.bool(args.quiesce, 'args.quiesce');
-	mod_assertplus.number(args.crcMode, 'args.crcMode');
 
 	collector = mod_artedi.createCollector({
 	    'labels': {
@@ -158,8 +136,7 @@ function fastDemoServer(args)
 	fastserver = new mod_fast.FastServer({
 	    'log': log,
 	    'collector': collector,
-	    'server': sock,
-	    'crc_mode': args.crcMode
+	    'server': sock
 	});
 
 	mod_fastdemo.demoRpcs().forEach(function (r) {

@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -90,17 +90,17 @@ function makeBigObject(width, depth)
  * MessageEncoder class.
  */
 function writeMessageForEncodedData(buf, msgid, status, dataenc, msgoffset,
-    crc_mode)
+    version)
 {
-	var crc, datalen;
-	if (crc_mode && crc_mode === mod_protocol.FAST_CHECKSUM_V1) {
-		crc = mod_old_crc.crc16(dataenc);
+	var crc;
+	if (version === mod_protocol.FP_VERSION_1) {
+	    crc = mod_old_crc.crc16(dataenc);
 	} else {
-		crc = mod_crc.crc16(dataenc);
+	    crc = mod_crc.crc16(dataenc);
 	}
-	datalen = Buffer.byteLength(dataenc);
+	var datalen = Buffer.byteLength(dataenc);
 
-	buf.writeUInt8(mod_protocol.FP_VERSION_1,
+	buf.writeUInt8(version || mod_protocol.FP_VERSION_CURRENT,
 	    msgoffset + mod_protocol.FP_OFF_VERSION);
 	buf.writeUInt8(mod_protocol.FP_TYPE_JSON,
 	    msgoffset + mod_protocol.FP_OFF_TYPE);

@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -69,7 +69,8 @@ function runTestCase(testcase, callback)
 	console.log('test case: %s', testcase.name);
 	ctc = new mod_testclient.ClientTestContext({
 	    'server': serverSocket,
-	    'log': testLog.child({ 'testcase': testcase.name })
+	    'log': testLog.child({ 'testcase': testcase.name }),
+	    'client_version': mod_protocol.FP_VERSION_CURRENT
 	});
 
 	ctc.establishConnection();
@@ -125,7 +126,7 @@ function runDuplicateResponseTest(ctc, firstIsError, secondStatus, callback)
 		    'data': secondStatus === mod_protocol.FP_STATUS_ERROR ?
 			mod_testcommon.dummyResponseError :
 			mod_testcommon.dummyResponseData,
-		    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
+		    'version': mod_protocol.FP_VERSION_CURRENT
 		});
 
 		/*
@@ -185,7 +186,7 @@ function runClientFailureTest(ctc, doFail, callback)
 			    'msgid': message.msgid,
 			    'status': mod_protocol.FP_STATUS_DATA,
 			    'data': mod_testcommon.dummyResponseData,
-			    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
+			    'version': mod_protocol.FP_VERSION_CURRENT
 			});
 		});
 	    },
@@ -339,7 +340,7 @@ var test_cases = [ {
 	    'msgid': 0x7,
 	    'status': mod_protocol.FP_STATUS_ERROR,
 	    'data': mod_testcommon.dummyResponseError,
-	    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
+	    'version': mod_protocol.FP_VERSION_CURRENT
 	});
 
 	ctc.ctc_fastclient.on('error', function (err) {
@@ -367,7 +368,7 @@ var test_cases = [ {
 		    'msgid': message.msgid,
 		    'status': mod_protocol.FP_STATUS_END,
 		    'data': { 'd': [ true, null, 7 ] },
-		    'crc_mode': mod_protocol.FAST_CHECKSUM_V2
+		    'version': mod_protocol.FP_VERSION_CURRENT
 		});
 	});
 
@@ -392,7 +393,8 @@ var test_cases = [ {
 		ctc.ctc_server_encoder.end({
 		    'msgid': message.msgid,
 		    'status': mod_protocol.FP_STATUS_END,
-		    'data': { 'd': [ true, null, 7 ] }
+		    'data': { 'd': [ true, null, 7 ] },
+		    'version': mod_protocol.FP_VERSION_CURRENT
 		});
 	});
 
@@ -444,7 +446,8 @@ var test_cases = [ {
 		ctc.ctc_server_encoder.write({
 		    'msgid': 1,
 		    'status': mod_protocol.FP_STATUS_DATA,
-		    'data': { 'd': null }
+		    'data': { 'd': null },
+		    'version': mod_protocol.FP_VERSION_CURRENT
 		});
 	    },
 	    function (requests) {
@@ -506,14 +509,9 @@ var test_cases = [ {
 			 * runClientFailureTest has already checked the
 			 * top-level error.  We need to check its cause.
 			 */
-			var cause = rq.ctr_error.cause();
-			mod_assertplus.equal(cause.name, 'FastTransportError');
-			mod_assertplus.ok(
-			    /^unexpected error on transport:/.test(
-			    cause.message));
-
-			cause = cause.cause();
-			mod_assertplus.ok(/ECONNRESET/.test(cause.message));
+			var name = rq.ctr_error.cause().name;
+			mod_assertplus.ok(name === 'FastTransportError' ||
+			    name === 'FastProtocolError');
 		});
 
 		mod_assertplus.equal(requests.length, 100);
@@ -576,7 +574,8 @@ var test_cases = [ {
 			ctc.ctc_server_encoder.write({
 			    'msgid': srq.msgid,
 			    'status': mod_protocol.FP_STATUS_END,
-			    'data': { 'd': [ srq.msgid ] }
+			    'data': { 'd': [ srq.msgid ] },
+			    'version': mod_protocol.FP_VERSION_CURRENT
 			});
 		});
 	});
@@ -623,7 +622,8 @@ var test_cases = [ {
 		ctc.ctc_server_encoder.write({
 		    'msgid': message.msgid,
 		    'status': mod_protocol.FP_STATUS_DATA,
-		    'data': mod_testcommon.dummyResponseData
+		    'data': mod_testcommon.dummyResponseData,
+		    'version': mod_protocol.FP_VERSION_CURRENT
 		});
 	});
 
@@ -723,7 +723,8 @@ var test_cases = [ {
 			var outmessage = {
 			    'msgid': message.msgid,
 			    'status': mod_protocol.FP_STATUS_DATA,
-			    'data': mod_testcommon.dummyResponseData
+			    'data': mod_testcommon.dummyResponseData,
+			    'version': mod_protocol.FP_VERSION_CURRENT
 			};
 
 			source = new mod_testcommon.FlowControlSource({

@@ -4,6 +4,19 @@
 
 None yet.
 
+## v3.0.0
+
+* Bump the protocol version to 2 as a means to better deal with the CRC
+  incompatibility stemming from the use of node-crc version 0.3.0. This change
+  replaces the attempt at addressing this issue that was part of v2.8.1. That
+  solution was found to be insufficient since there were cases where the
+  calcluated CRC codes from the 0.3.0 version of node-crc were correct. With
+  this release the protocol version is used to clearly determine which version
+  of node-crc should be used to decode a received message and encode a
+  response. Servers using this version are still compatible with fast clients
+  using protocol version 1, but servers using protocol version 1 will not
+  support clients using protocol version 2.
+
 ## v2.8.1
 
 * node-fast use wrong CRC library version when encoding errors to clients using
