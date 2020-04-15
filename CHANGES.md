@@ -4,6 +4,12 @@
 
 None yet.
 
+## v3.0.1
+
+* Add support for a `metricLabels` option when creating node-fast clients. This
+  option must be a valid [artedi](https://github.com/joyent/node-artedi) labels
+  object.
+
 ## v3.0.0
 
 * Bump the protocol version to 2 as a means to better deal with the CRC

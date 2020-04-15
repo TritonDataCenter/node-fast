@@ -186,6 +186,7 @@ Constructor arguments:
 Name              | Type         | Meaning
 ----------------- | ------------ | -------
 `collector`       | object       | [artedi](https://github.com/joyent/node-artedi)-style metric collector
+`metricLabels`    | object       | [artedi](https://github.com/joyent/node-artedi)-style metric labels to be added to every metric collected. Note: `rpcMethod` is a reserved label and will be ignored if included.
 `log`             | object       | [bunyan](https://github.com/trentm/node-bunyan)-style logger
 `transport`       | `net.Socket` | underlying TCP connection to the server
 `nRecentRequests` | positive int | number of recent requests to track for debugging purposes
