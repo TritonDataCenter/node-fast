@@ -4,6 +4,11 @@
 
 None yet.
 
+## v3.1.0
+
+* Added fsr_context.addSocketEndListener() method so that long running RPC
+  calls can tell when the client socket has ended.
+
 ## v3.0.1
 
 * Add support for a `metricLabels` option when creating node-fast clients. This
