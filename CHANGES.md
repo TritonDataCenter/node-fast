@@ -4,6 +4,11 @@
 
 None yet.
 
+## v3.1.1
+
+* Added fsr_context.removeSocketEndListener() method so that long running RPC
+  calls can remove their listener.
+
 ## v3.1.0
 
 * Added fsr_context.addSocketEndListener() method so that long running RPC
