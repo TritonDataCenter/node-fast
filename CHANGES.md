@@ -4,6 +4,10 @@
 
 None yet.
 
+## v3.1.2
+
+* Bump microtime to 3.0.0 for compatibility with node v6+
+
 ## v3.1.1
 
 * Added fsr_context.removeSocketEndListener() method so that long running RPC
