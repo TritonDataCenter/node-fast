@@ -4,6 +4,10 @@
 
 None yet.
 
+## v2.8.2
+
+* Stop using git:// URLs
+
 ## v2.8.1
 
 * node-fast use wrong CRC library version when encoding errors to clients using
