@@ -6,7 +6,7 @@ None yet.
 
 ## v2.8.2
 
-* Stop using git:// URLs
+* [TOOLS-2525](https://jira.joyent.us/browse/TOOLS-2525) Everything needs to stop cloning with git:// URLs
 
 ## v2.8.1
 
