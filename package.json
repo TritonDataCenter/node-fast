@@ -9,11 +9,11 @@
     ],
     "name": "fast",
     "homepage": "https://github.com/mcavage/node-fast",
-    "version": "0.5.3",
+    "version": "0.5.4",
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "git://github.com/mcavage/node-fast.git"
+        "url": "https://github.com/mcavage/node-fast.git"
     },
     "main": "lib/index.js",
     "engines": {
